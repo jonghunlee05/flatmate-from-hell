@@ -83,20 +83,8 @@ export default class Mess extends Phaser.GameObjects.Container {
       console.warn('Could not notify scene of mess cleaning:', error);
     }
     
-    // Remove from scene after a short delay - with safety check
-    try {
-      if (this.scene && this.scene.time) {
-        this.scene.time.delayedCall(500, () => {
-          this.destroy();
-        });
-      } else {
-        // Fallback: destroy immediately if scene is not available
-        this.destroy();
-      }
-    } catch (error) {
-      console.warn('Could not schedule mess destruction:', error);
-      this.destroy();
-    }
+    // Destroy immediately to ensure proper cleanup
+    this.destroy();
   }
 
   getRoomIndex(): number {

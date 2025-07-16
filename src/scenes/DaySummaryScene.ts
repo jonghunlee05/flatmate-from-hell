@@ -2,9 +2,10 @@ import Phaser from 'phaser';
 
 interface DayStats {
   messesCleaned: number;
+  itemsFixed: number;
   finalMood: number;
   finalCleanliness: number;
-  finalFlatmateRage: number;
+  finalRage: number;
   finalHealth: number;
   coinsEarned: number;
 }
@@ -20,11 +21,12 @@ export default class DaySummaryScene extends Phaser.Scene {
     this.cameras.main.setBackgroundColor('#111');
 
     // Get day stats from registry
-    const dayStats: DayStats = this.game.registry.get('dayStats') || {
+    const dayStats: DayStats = this.game.registry.get('daySummaryStats') || {
       messesCleaned: 0,
+      itemsFixed: 0,
       finalMood: 100,
       finalCleanliness: 100,
-      finalFlatmateRage: 0,
+      finalRage: 0,
       finalHealth: 100,
       coinsEarned: 0
     };
@@ -74,10 +76,10 @@ export default class DaySummaryScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Flatmate rage level
-    this.add.text(width / 2, statsY + statSpacing * 3, `🟥 Flatmate Rage: ${dayStats.finalFlatmateRage}%`, {
+    this.add.text(width / 2, statsY + statSpacing * 3, `🟥 Flatmate Rage: ${dayStats.finalRage}%`, {
       fontFamily: 'Courier, monospace',
       fontSize: '20px',
-      color: dayStats.finalFlatmateRage < 50 ? '#39ff14' : '#ff4500',
+      color: dayStats.finalRage < 50 ? '#39ff14' : '#ff4500',
       align: 'center'
     }).setOrigin(0.5);
 
@@ -97,9 +99,17 @@ export default class DaySummaryScene extends Phaser.Scene {
       align: 'center'
     }).setOrigin(0.5);
 
+    // Items fixed
+    this.add.text(width / 2, statsY + statSpacing * 6, `🔧 Items Fixed: ${dayStats.itemsFixed}`, {
+      fontFamily: 'Courier, monospace',
+      fontSize: '18px',
+      color: '#ffffff',
+      align: 'center'
+    }).setOrigin(0.5);
+
     // Performance rating
     const performance = this.calculatePerformance(dayStats);
-    this.add.text(width / 2, statsY + statSpacing * 6, `Performance: ${performance}`, {
+    this.add.text(width / 2, statsY + statSpacing * 7, `Performance: ${performance}`, {
       fontFamily: 'Courier, monospace',
       fontSize: '22px',
       color: this.getPerformanceColor(performance),
@@ -126,8 +136,9 @@ export default class DaySummaryScene extends Phaser.Scene {
       continueBtn.setColor('#ffffff');
     });
     continueBtn.on('pointerdown', () => {
-      // For now, go back to home scene
+      // Reset game state and go back to home scene
       // In the future, this could start Day 2
+      this.resetGameState();
       this.scene.start('HomeScene');
     });
 
@@ -147,12 +158,14 @@ export default class DaySummaryScene extends Phaser.Scene {
       menuBtn.setColor('#ffffff');
     });
     menuBtn.on('pointerdown', () => {
+      // Clear game state when going to main menu
+      this.resetGameState();
       this.scene.start('HomeScene');
     });
   }
 
   private calculatePerformance(stats: DayStats): string {
-    const score = (stats.messesCleaned * 20) + (stats.finalMood * 0.5) + (stats.finalCleanliness * 0.3) + (stats.finalHealth * 0.4) + (100 - stats.finalFlatmateRage * 0.5);
+    const score = (stats.messesCleaned * 20) + (stats.itemsFixed * 30) + (stats.finalMood * 0.5) + (stats.finalCleanliness * 0.3) + (stats.finalHealth * 0.4) + (100 - stats.finalRage * 0.5);
     
     if (score >= 200) return 'EXCELLENT';
     if (score >= 150) return 'GOOD';
@@ -170,5 +183,25 @@ export default class DaySummaryScene extends Phaser.Scene {
       case 'TERRIBLE': return '#ff4500';
       default: return '#ffffff';
     }
+  }
+
+  private resetGameState() {
+    console.log('Resetting game state from day summary');
+    
+    // Clear all game-related registry data
+    this.game.registry.remove('gameState');
+    this.game.registry.remove('daySummaryStats');
+    this.game.registry.remove('globalTimerState');
+    this.game.registry.remove('flatmateRoom');
+    this.game.registry.remove('playerX');
+    this.game.registry.remove('playerY');
+    this.game.registry.remove('fromRoom');
+    this.game.registry.remove('showGlobalNotification');
+    
+    // Clear all room-specific mess data
+    const rooms = ['Your Bedroom', 'Flatmate Bedroom', 'Living Room', 'Kitchen', 'Bathroom', 'Laundry'];
+    rooms.forEach(room => {
+      this.game.registry.remove(`messes_${room}`);
+    });
   }
 } 

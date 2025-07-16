@@ -1,11 +1,10 @@
 import Phaser from 'phaser';
-import { GameState } from '../scenes/GameScene';
+import { GameState } from '../scenes/rooms/BaseRoomScene';
 
 export default class DayUI {
   private scene: Phaser.Scene;
   private gameState: GameState;
   private phaseText: Phaser.GameObjects.Text;
-  private timerText: Phaser.GameObjects.Text;
   private moodText: Phaser.GameObjects.Text;
   private cleanlinessText: Phaser.GameObjects.Text;
   private healthText: Phaser.GameObjects.Text;
@@ -32,14 +31,14 @@ export default class DayUI {
       padding: { left: 12, right: 12, top: 6, bottom: 6 }
     }).setOrigin(0.5);
 
-    // Timer text (below phase)
-    this.timerText = scene.add.text(width / 2, 60, '60', {
-      fontFamily: 'Courier, monospace',
-      fontSize: '20px',
-      color: '#ffffff',
-      backgroundColor: '#333333',
-      padding: { left: 8, right: 8, top: 4, bottom: 4 }
-    }).setOrigin(0.5);
+    // Timer text (below phase) - DISABLED, using separate Timer component instead
+    // this.timerText = scene.add.text(width / 2, 60, '60', {
+    //   fontFamily: 'Courier, monospace',
+    //   fontSize: '20px',
+    //   color: '#ffffff',
+    //   backgroundColor: '#333333',
+    //   padding: { left: 8, right: 8, top: 4, bottom: 4 }
+    // }).setOrigin(0.5);
 
     // Create mini-map in top right
     this.createMiniMap(width, height);
@@ -94,9 +93,9 @@ export default class DayUI {
   update(gameState: GameState) {
     this.gameState = gameState;
 
-    // Update timer
-    const remainingTime = Math.max(0, 60 - Math.floor(gameState.phaseTime / 1000));
-    this.timerText.setText(remainingTime.toString());
+    // Timer is now handled by separate Timer component
+    // const remainingTime = Math.max(0, 60 - Math.floor(gameState.phaseTime / 1000));
+    // this.timerText.setText(remainingTime.toString());
 
     // PARAMETERS FROZEN - Static values for now
     this.moodText.setText('🟪 Mood: 100%');

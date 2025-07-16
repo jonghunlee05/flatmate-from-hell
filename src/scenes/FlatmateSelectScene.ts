@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import BaseRoomScene from './rooms/BaseRoomScene';
 
 export const FLATMATES = [
   {
@@ -105,6 +106,9 @@ export default class FlatmateSelectScene extends Phaser.Scene {
     selectBtn.on('pointerover', () => selectBtn.setColor('#fff'));
     selectBtn.on('pointerout', () => selectBtn.setColor('#39FF14'));
     selectBtn.on('pointerdown', () => {
+      // Clear all previous game state when starting a new game
+      this.resetGameState();
+      
       this.game.registry.set('selectedFlatmateId', FLATMATES[this.currentIndex].id);
       console.log('Selected flatmate (registry):', FLATMATES[this.currentIndex].id);
       this.scene.start('PlayerBedroomScene');
@@ -120,5 +124,35 @@ export default class FlatmateSelectScene extends Phaser.Scene {
     this.quoteText.setText('"' + f.quote + '"');
     this.diffText.setText(f.difficulty);
     this.portraitLabel.setText('[ Portrait ]');
+  }
+
+  private resetGameState() {
+    console.log('Resetting game state for new game');
+    
+    // Clear all game-related registry data
+    this.game.registry.remove('gameState');
+    this.game.registry.remove('daySummaryStats');
+    this.game.registry.remove('globalTimerState');
+    this.game.registry.remove('flatmateRoom');
+    this.game.registry.remove('playerX');
+    this.game.registry.remove('playerY');
+    this.game.registry.remove('fromRoom');
+    this.game.registry.remove('showGlobalNotification');
+    
+    // Clear all room-specific mess data
+    const rooms = ['Your Bedroom', 'Flatmate Bedroom', 'Living Room', 'Kitchen', 'Bathroom', 'Laundry'];
+    rooms.forEach(room => {
+      this.game.registry.remove(`messes_${room}`);
+    });
+    
+    // Clear static variables
+    BaseRoomScene.allRoomScenes = [];
+    BaseRoomScene.globalMessTimer = 0;
+    BaseRoomScene.lastGlobalSpawnTime = 0;
+    BaseRoomScene.isGlobalTransitioning = false;
+    
+    // Initialize flatmate to Living Room for new game
+    this.game.registry.set('flatmateRoom', 'Living Room');
+    console.log('New game: Flatmate initialized to Living Room');
   }
 } 

@@ -1,7 +1,23 @@
 import Phaser from 'phaser';
 import Player from '../../entities/Player';
 import Mess from '../../entities/Mess';
-import { GameState } from '../GameScene';
+import BrokenItem from '../../entities/BrokenItem';
+import FurnitureManager from '../../systems/FurnitureManager';
+import Timer from '../../ui/Timer';
+
+// Define GameState interface locally since GameScene was removed
+export interface GameState {
+  currentPhase: 'morning' | 'afternoon' | 'evening' | 'night';
+  phaseTime: number;
+  messesSpawned: number;
+  messesCleaned: number;
+  brokenItemsSpawned: number;
+  brokenItemsFixed: number;
+  playerMood: number;
+  cleanliness: number;
+  flatmateRage: number;
+  playerHealth: number;
+}
 
 export interface DoorConfig {
   x: number;
@@ -16,6 +32,7 @@ export interface DoorConfig {
 export default abstract class BaseRoomScene extends Phaser.Scene {
   protected player!: Player;
   protected messes: Mess[] = [];
+  protected brokenItems: BrokenItem[] = [];
   protected doors: Phaser.GameObjects.Rectangle[] = [];
   protected doorConfigs: DoorConfig[] = [];
   protected gameState: GameState;
@@ -43,6 +60,12 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
   protected pauseButton!: Phaser.GameObjects.Text;
   protected pauseMenu?: Phaser.GameObjects.Container;
   protected isPaused: boolean = false;
+  protected timer!: Timer;
+  protected phaseLabel!: Phaser.GameObjects.Text;
+  protected currentPhase: 'morning' | 'afternoon' | 'evening' | 'night' = 'morning';
+  protected phaseDuration: number = 60000; // 60 seconds per phase
+  protected isTransitioning: boolean = false;
+  protected transitionCooldown: number = 1000; // 1 second cooldown
 
   constructor(key: string, roomName: string, roomColor: number) {
     super({ key });
@@ -68,6 +91,7 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
   static allRoomScenes: BaseRoomScene[] = [];
   static globalMessTimer: number = 0;
   static lastGlobalSpawnTime: number = 0;
+  static isGlobalTransitioning: boolean = false;
 
   static spawnMessInRandomRoom(sceneManager: Phaser.Scenes.SceneManager) {
     const rooms = ['Your Bedroom', 'Flatmate Bedroom', 'Living Room', 'Kitchen', 'Bathroom', 'Laundry'];
@@ -126,11 +150,25 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     const height = this.cameras.main.height;
     this.cameras.main.setBackgroundColor('#1a1a1a');
 
+    // Reset transitioning flags for new room
+    this.isTransitioning = false;
+    BaseRoomScene.isGlobalTransitioning = false;
+
     // Get game state from registry or use default
     const storedGameState = this.game.registry.get('gameState');
     if (storedGameState) {
       this.gameState = storedGameState;
     }
+
+    // Initialize flatmate to Living Room if this is the first time
+    if (!this.game.registry.get('flatmateRoom')) {
+      console.log('First time setup: Initializing flatmate to Living Room');
+      this.game.registry.set('flatmateRoom', 'Living Room');
+    }
+    
+    // Debug: Log current flatmate state
+    const flatmateRoom = this.game.registry.get('flatmateRoom');
+    console.log(`[${this.roomName}] Create: Flatmate should be in ${flatmateRoom}`);
 
     // Setup input
     this.setupInput();
@@ -149,7 +187,17 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
 
     // Spawn initial messes only if this room doesn't have any yet
     this.spawnInitialMesses();
+    this.spawnInitialBrokenItems();
     this.spawnFlatmateIfNeeded();
+    
+    // Set up periodic flatmate check
+    this.time.addEvent({
+      delay: 2000, // Check every 2 seconds
+      loop: true,
+      callback: () => {
+        this.ensureFlatmateVisible();
+      }
+    });
   }
 
   shutdown() {
@@ -157,10 +205,23 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     const idx = BaseRoomScene.allRoomScenes.indexOf(this);
     if (idx !== -1) BaseRoomScene.allRoomScenes.splice(idx, 1);
     
-    // Clean up any timers
-    if (this.flatmateTimer) {
-      this.flatmateTimer.remove(false);
+    // Don't destroy flatmate timer when changing rooms - preserve flatmate state
+    // The timer will continue running and move the flatmate to other rooms
+    // Only destroy if the scene is being completely shut down
+    if (this.scene.isSleeping()) {
+      console.log(`[${this.roomName}] Scene sleeping - preserving flatmate timer`);
+    } else {
+      console.log(`[${this.roomName}] Scene shutting down - cleaning up flatmate timer`);
+      if (this.flatmateTimer) {
+        this.flatmateTimer.remove(false);
+      }
     }
+    
+    // Save messes for this room
+    this.saveMessesForRoom();
+    
+    // Save game state to registry
+    this.game.registry.set('gameState', this.gameState);
   }
 
   private setupInput() {
@@ -256,15 +317,60 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
 
   private createUI() {
     const width = this.cameras.main.width;
+    const height = this.cameras.main.height;
+    
+    // Get current phase from game state
+    this.currentPhase = this.gameState.currentPhase;
     
     // Phase and timer
-    this.add.text(width / 2, 20, 'DAY 1: MORNING', {
+    const phaseNames = {
+      morning: 'MORNING',
+      afternoon: 'AFTERNOON', 
+      evening: 'EVENING',
+      night: 'NIGHT'
+    };
+    
+    this.phaseLabel = this.add.text(width / 2, 20, `DAY 1: ${phaseNames[this.currentPhase]}`, {
       fontFamily: 'Courier, monospace',
       fontSize: '20px',
       color: '#39ff14',
       backgroundColor: '#000000',
       padding: { left: 8, right: 8, top: 4, bottom: 4 }
     }).setOrigin(0.5);
+
+    // Create timer (bottom left) - sync with global timer state
+    const globalTimerState = this.game.registry.get('globalTimerState') || { remaining: 60, phase: 'morning' };
+    
+    // Only create a new timer if this is the first room or if we're in a different phase
+    if (!globalTimerState.phase || globalTimerState.phase !== this.currentPhase) {
+      // New phase, start fresh timer
+      this.timer = new Timer(this, 50, height - 50, 60);
+      this.timer.setDepth(1000);
+      this.timer.start();
+      
+      // Store global timer state
+      this.game.registry.set('globalTimerState', {
+        remaining: 60,
+        phase: this.currentPhase,
+        startTime: Date.now()
+      });
+    } else {
+      // Same phase, calculate remaining time
+      const startTime = globalTimerState.startTime || Date.now();
+      const elapsed = (Date.now() - startTime) / 1000;
+      const remaining = Math.max(0, 60 - elapsed);
+      
+      this.timer = new Timer(this, 50, height - 50, remaining);
+      this.timer.setDepth(1000);
+      this.timer.start();
+    }
+    
+    console.log(`Timer created in ${this.roomName} for phase: ${this.currentPhase}`);
+    
+    // Set up timer completion event
+    this.timer.on('complete', () => {
+      this.transitionToNextPhase();
+    });
 
     // Pause button (top-left)
     this.pauseButton = this.add.text(20, 20, '⏸️ PAUSE', {
@@ -555,7 +661,53 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     }
   }
 
+  protected spawnInitialBrokenItems() {
+    // Load existing broken items from registry for this room
+    const roomBrokenItemsKey = `brokenItems_${this.roomName}`;
+    const existingBrokenItems = this.game.registry.get(roomBrokenItemsKey) || [];
+    
+    // Restore existing broken items from registry
+    existingBrokenItems.forEach((itemData: any) => {
+      const furnitureData = FurnitureManager.getFurnitureById(this.roomName, itemData.furnitureId);
+      if (furnitureData) {
+        const brokenItem = new BrokenItem(this, furnitureData);
+        this.brokenItems.push(brokenItem);
+        this.add.existing(brokenItem);
+        this.gameState.brokenItemsSpawned++;
+      }
+    });
+  }
+
+  protected spawnRandomBrokenItem() {
+    const furnitureData = FurnitureManager.getRandomFurniture(this.roomName);
+    if (furnitureData) {
+      const brokenItem = new BrokenItem(this, furnitureData);
+      this.brokenItems.push(brokenItem);
+      this.add.existing(brokenItem);
+      this.gameState.brokenItemsSpawned++;
+      
+      // Store in registry
+      const roomBrokenItemsKey = `brokenItems_${this.roomName}`;
+      const existingBrokenItems = this.game.registry.get(roomBrokenItemsKey) || [];
+      existingBrokenItems.push({
+        furnitureId: furnitureData.id,
+        timestamp: Date.now()
+      });
+      this.game.registry.set(roomBrokenItemsKey, existingBrokenItems);
+    }
+  }
+
   protected transitionToRoom(targetScene: string, targetRoom: string, fromDoor?: DoorConfig) {
+    // Prevent spam clicking - check if already transitioning
+    if (this.isTransitioning || BaseRoomScene.isGlobalTransitioning) {
+      console.log('Room transition already in progress, ignoring click');
+      return;
+    }
+    
+    // Set transitioning flags
+    this.isTransitioning = true;
+    BaseRoomScene.isGlobalTransitioning = true;
+    
     // Store the room we're coming from
     this.game.registry.set('fromRoom', this.roomName);
     // Store which door we used (for fallback)
@@ -569,8 +721,12 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     
     // Store game state
     this.game.registry.set('gameState', this.gameState);
-    // Transition to new scene
-    this.scene.start(targetScene);
+    
+    // Add a small delay to prevent rapid transitions
+    this.time.delayedCall(100, () => {
+      // Transition to new scene
+      this.scene.start(targetScene);
+    });
   }
 
   private saveMessesForRoom() {
@@ -593,14 +749,27 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
       return;
     }
 
+    // Update timer
+    if (this.timer) {
+      this.timer.update(time, delta);
+      
+      // Update global timer state
+      this.game.registry.set('globalTimerState', {
+        remaining: this.timer.getRemaining(),
+        phase: this.currentPhase,
+        startTime: Date.now() - (60 - this.timer.getRemaining()) * 1000
+      });
+    }
+
     // Update game state time
     this.gameState.phaseTime += delta;
 
     // Handle player input
     this.handlePlayerInput();
 
-    // Handle cleaning
+    // Handle cleaning and repairing
     this.handleCleaning();
+    this.handleRepairing();
 
     // Handle door interactions
     this.handleDoorInteractions();
@@ -608,6 +777,7 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     // Update entities
     this.player.update(time, delta);
     this.messes.forEach(mess => mess.update(time, delta));
+    this.brokenItems.forEach(item => item.update(time, delta));
 
     // Update parameter decay
     this.updateParameterDecay(delta);
@@ -619,6 +789,32 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
       
       // Keep label above flatmate
       this.flatmateLabel.setPosition(this.flatmateSprite.x, this.flatmateSprite.y - 32);
+    } else {
+      // If flatmate should be here but isn't visible, try to spawn it
+      const flatmateRoom = this.game.registry.get('flatmateRoom') || 'Living Room';
+      if (this.roomName === flatmateRoom && !this.flatmateSprite) {
+        console.log(`[${this.roomName}] Update: Flatmate should be here but not visible, attempting to spawn`);
+        this.spawnFlatmateIfNeeded();
+      }
+    }
+    
+    // Force spawn flatmate if this is Living Room and no flatmate exists anywhere
+    if (this.roomName === 'Living Room' && !this.flatmateSprite) {
+      const flatmateRoom = this.game.registry.get('flatmateRoom');
+      if (!flatmateRoom || flatmateRoom === 'Living Room') {
+        console.log(`[${this.roomName}] Force spawning flatmate in Living Room`);
+        this.game.registry.set('flatmateRoom', 'Living Room');
+        this.spawnFlatmateIfNeeded();
+      }
+    }
+    
+    // Debug: Log flatmate status every 10 seconds
+    if (this.time.now % 10000 < 16) { // Every ~10 seconds
+      const flatmateRoom = this.game.registry.get('flatmateRoom') || 'Living Room';
+      const hasTimer = !!this.flatmateTimer;
+      const hasSprite = !!this.flatmateSprite;
+      const isActiveScene = this.scene && this.scene.isActive();
+      console.log(`[${this.roomName}] Debug: Flatmate in ${flatmateRoom}, hasTimer: ${hasTimer}, hasSprite: ${hasSprite}, sceneActive: ${isActiveScene}`);
     }
 
     // Check for global notifications
@@ -628,36 +824,36 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
       BaseRoomScene.showGlobalMessNotification(notificationRoom);
     }
     
-    // Global mess timer - run in the currently active room scene
-    if (this.scene.isActive()) {
-      BaseRoomScene.globalMessTimer += delta;
-      if (BaseRoomScene.globalMessTimer > 5000) { // Every 5 seconds
-        BaseRoomScene.globalMessTimer = 0;
-        BaseRoomScene.spawnMessInRandomRoom(this.scene.manager);
-      }
-    }
+    // DISABLED: Global mess timer - messes will be spawned by phase system instead
+    // if (this.scene.isActive()) {
+    //   BaseRoomScene.globalMessTimer += delta;
+    //   if (BaseRoomScene.globalMessTimer > 5000) { // Every 5 seconds
+    //     BaseRoomScene.globalMessTimer = 0;
+    //     BaseRoomScene.spawnMessInRandomRoom(this.scene.manager);
+    //   }
+    // }
     
-    // Check for new messes in registry for this room
-    const roomMessesKey = `messes_${this.roomName}`;
-    const registryMesses = this.game.registry.get(roomMessesKey) || [];
-    const currentMessCount = this.messes.length;
-    
-    // Debug: Log the check
-    if (registryMesses.length > currentMessCount) {
-      console.log(`${this.roomName}: Found ${registryMesses.length - currentMessCount} new messes in registry`);
-    }
-    
-    // If there are more messes in registry than currently spawned, spawn the new ones
-    if (registryMesses.length > currentMessCount) {
-      const newMesses = registryMesses.slice(currentMessCount);
-      newMesses.forEach((messData: any) => {
-        console.log(`Spawning mess in ${this.roomName} at (${messData.x}, ${messData.y})`);
-        const mess = new Mess(this, messData.x, messData.y, 0);
-        this.messes.push(mess);
-        this.add.existing(mess);
-        this.gameState.messesSpawned++;
-      });
-    }
+    // DISABLED: Registry mess spawning - messes will be spawned by phase system instead
+    // const roomMessesKey = `messes_${this.roomName}`;
+    // const registryMesses = this.game.registry.get(roomMessesKey) || [];
+    // const currentMessCount = this.messes.length;
+    // 
+    // // Debug: Log the check
+    // if (registryMesses.length > currentMessCount) {
+    //   console.log(`${this.roomName}: Found ${registryMesses.length - currentMessCount} new messes in registry`);
+    // }
+    // 
+    // // If there are more messes in registry than currently spawned, spawn the new ones
+    // if (registryMesses.length > currentMessCount) {
+    //   const newMesses = registryMesses.slice(currentMessCount);
+    //   newMesses.forEach((messData: any) => {
+    //     console.log(`Spawning mess in ${this.roomName} at (${messData.x}, ${messData.y})`);
+    //     const mess = new Mess(this, messData.x, messData.y, 0);
+    //     this.messes.push(mess);
+    //     this.add.existing(mess);
+    //     this.gameState.messesSpawned++;
+    //   });
+    // }
     
 
   }
@@ -705,6 +901,28 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     }
   }
 
+  private handleRepairing() {
+    if (this.spaceKey.isDown) {
+      const nearbyBrokenItem = this.brokenItems.find(item => 
+        Phaser.Math.Distance.Between(
+          this.player.x, this.player.y,
+          item.x, item.y
+        ) < 50
+      );
+
+      if (nearbyBrokenItem && !nearbyBrokenItem.isRepairing()) {
+        nearbyBrokenItem.startRepair();
+      }
+    } else {
+      // Stop repairing when space is released and reset progress
+      this.brokenItems.forEach(item => {
+        if (item.isRepairing()) {
+          item.stopRepair();
+        }
+      });
+    }
+  }
+
   private handleDoorInteractions() {
     let nearestDoor: DoorConfig | null = null;
     let nearestDistance = Infinity;
@@ -731,8 +949,17 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
       }
       
       // Handle E key press
-      if (this.eKey.isDown) {
+      if (this.eKey.isDown && !this.isTransitioning) {
         this.transitionToRoom(nearestDoor.targetScene, nearestDoor.targetRoom, nearestDoor);
+      }
+      
+      // Show transitioning feedback
+      if (this.isTransitioning) {
+        this.doorPrompt.setText('Transitioning...');
+        this.doorPrompt.setColor('#ffaa00');
+      } else {
+        this.doorPrompt.setText(`Press E to move to ${nearestDoor.targetRoom}`);
+        this.doorPrompt.setColor('#39ff14');
       }
     } else {
       if (this.isNearDoor) {
@@ -771,6 +998,17 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     
     // Remove cleaned mess from array
     this.messes = this.messes.filter(mess => !mess.isCompleted());
+  }
+
+  public onItemRepaired() {
+    this.gameState.brokenItemsFixed++;
+    this.gameState.playerMood = Math.min(100, this.gameState.playerMood + 3);
+    this.gameState.cleanliness = Math.min(100, this.gameState.cleanliness + 5);
+    this.gameState.playerHealth = Math.min(100, this.gameState.playerHealth + 2);
+    this.gameState.flatmateRage = Math.max(0, this.gameState.flatmateRage - 3);
+    
+    // Remove repaired item from array
+    this.brokenItems = this.brokenItems.filter(item => !item.isCompleted());
   }
 
   private showMessNotification() {
@@ -886,11 +1124,20 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     this.scene.start('HomeScene');
   }
 
-  private spawnFlatmateIfNeeded() {
-    const flatmateRoom = this.game.registry.get('flatmateRoom') || 'Living Room';
+  protected spawnFlatmateIfNeeded() {
+    // Initialize flatmate room to Living Room if not set
+    if (!this.game.registry.get('flatmateRoom')) {
+      console.log('Initializing flatmate to Living Room');
+      this.game.registry.set('flatmateRoom', 'Living Room');
+    }
+    
+    const flatmateRoom = this.game.registry.get('flatmateRoom');
+    
+    console.log(`[${this.roomName}] Checking flatmate spawn. Flatmate should be in: ${flatmateRoom}`);
     
     // Only spawn flatmate if this is the flatmate's current room
     if (this.roomName !== flatmateRoom) {
+      console.log(`[${this.roomName}] Not flatmate's room, removing if present`);
       // Remove flatmate if present in wrong room
       if (this.flatmateSprite) {
         this.flatmateSprite.destroy();
@@ -905,6 +1152,7 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     
     // Spawn flatmate if not already present
     if (!this.flatmateSprite) {
+      console.log(`[${this.roomName}] Spawning flatmate`);
       // Place flatmate at a random position in this room
       const x = Phaser.Math.Between(200, this.cameras.main.width - 200);
       const y = Phaser.Math.Between(200, this.cameras.main.height - 200);
@@ -917,19 +1165,30 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
       // Set initial movement target
       this.setNewFlatmateTarget();
       
-      // Schedule room change and movement updates
-      this.scheduleFlatmateMove();
+      // Schedule room change and movement updates (only if not already scheduled)
+      if (!this.flatmateTimer) {
+        this.scheduleFlatmateMove();
+      }
+      
+      console.log(`[${this.roomName}] Flatmate spawned successfully at (${x}, ${y})`);
+    } else {
+      console.log(`[${this.roomName}] Flatmate already present`);
     }
   }
 
   private scheduleFlatmateMove() {
-    if (this.flatmateTimer) this.flatmateTimer.remove(false);
+    if (this.flatmateTimer) {
+      console.log(`[${this.roomName}] Removing existing flatmate timer`);
+      this.flatmateTimer.remove(false);
+    }
     this.flatmateTimer = this.time.addEvent({
-      delay: Phaser.Math.Between(4000, 7000),
+      delay: Phaser.Math.Between(8000, 15000), // Longer intervals for more stable movement
       callback: () => {
+        console.log(`[${this.roomName}] Flatmate timer callback triggered`);
         this.moveFlatmateToAnotherRoom();
       }
     });
+    console.log(`[${this.roomName}] Scheduled flatmate move in ${this.flatmateTimer.delay}ms`);
   }
 
   private setNewFlatmateTarget() {
@@ -973,7 +1232,7 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
   }
 
   private moveFlatmateToAnotherRoom() {
-    // List of all rooms except player's current room
+    // List of all rooms except player's bedroom (Your Bedroom)
     const allRooms = [
       'Living Room',
       'Flatmate Bedroom',
@@ -981,13 +1240,208 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
       'Bathroom',
       'Laundry'
     ];
-    const otherRooms = allRooms.filter(r => r !== this.roomName);
+    // Never move to player's bedroom
+    const otherRooms = allRooms.filter(r => r !== 'Your Bedroom');
     const nextRoom = Phaser.Utils.Array.GetRandom(otherRooms);
+    
+    console.log(`[${this.roomName}] Flatmate moving from ${this.roomName} to ${nextRoom}`);
+    
     // Remove flatmate from this room
-    if (this.flatmateSprite) this.flatmateSprite.destroy();
-    if (this.flatmateLabel) this.flatmateLabel.destroy();
+    if (this.flatmateSprite) {
+      this.flatmateSprite.destroy();
+      this.flatmateSprite = undefined;
+    }
+    if (this.flatmateLabel) {
+      this.flatmateLabel.destroy();
+      this.flatmateLabel = undefined;
+    }
+    
     // Tell the registry where the flatmate is going
     this.game.registry.set('flatmateRoom', nextRoom);
-    // Flatmate will be spawned in the next room's create()
+    console.log(`[${this.roomName}] Updated registry: flatmateRoom = ${nextRoom}`);
+    
+    // Schedule next move (but only if this scene is still active)
+    if (this.scene && this.scene.isActive()) {
+      this.scheduleFlatmateMove();
+    } else {
+      console.log(`[${this.roomName}] Scene not active, not scheduling next move`);
+    }
+  }
+
+  private ensureFlatmateVisible() {
+    const flatmateRoom = this.game.registry.get('flatmateRoom') || 'Living Room';
+    
+    // If this is the flatmate's room but flatmate isn't visible, spawn it
+    if (this.roomName === flatmateRoom && !this.flatmateSprite) {
+      console.log(`[${this.roomName}] Periodic check: Flatmate missing, spawning`);
+      this.spawnFlatmateIfNeeded();
+    }
+    
+    // If flatmate is in wrong room, remove it
+    if (this.roomName !== flatmateRoom && this.flatmateSprite) {
+      console.log(`[${this.roomName}] Periodic check: Flatmate in wrong room, removing`);
+      this.flatmateSprite.destroy();
+      this.flatmateSprite = undefined;
+      if (this.flatmateLabel) {
+        this.flatmateLabel.destroy();
+        this.flatmateLabel = undefined;
+      }
+    }
+    
+    // Ensure flatmate timer is running if flatmate should be in this room
+    if (this.roomName === flatmateRoom && this.flatmateSprite && !this.flatmateTimer) {
+      console.log(`[${this.roomName}] Flatmate timer missing, rescheduling`);
+      this.scheduleFlatmateMove();
+    }
+  }
+
+  private transitionToNextPhase() {
+    const phases: ('morning' | 'afternoon' | 'evening' | 'night')[] = ['morning', 'afternoon', 'evening', 'night'];
+    const currentIndex = phases.indexOf(this.currentPhase);
+    const nextIndex = (currentIndex + 1) % phases.length;
+    const nextPhase = phases[nextIndex];
+    
+    console.log(`Phase transition: ${this.currentPhase} → ${nextPhase}`);
+    
+    // Special handling for night phase - show day summary instead of cycling
+    if (this.currentPhase === 'night') {
+      console.log('Night phase completed - showing day summary');
+      this.showDaySummary();
+      return;
+    }
+    
+    // Update current phase
+    this.currentPhase = nextPhase;
+    this.gameState.currentPhase = nextPhase;
+    
+    // Update phase label
+    const phaseNames = {
+      morning: 'MORNING',
+      afternoon: 'AFTERNOON', 
+      evening: 'EVENING',
+      night: 'NIGHT'
+    };
+    this.phaseLabel.setText(`DAY 1: ${phaseNames[nextPhase]}`);
+    
+    // Reset timer for new phase
+    this.timer.reset(60);
+    this.timer.start();
+    
+    // Update global timer state
+    this.game.registry.set('globalTimerState', {
+      remaining: 60,
+      phase: nextPhase,
+      startTime: Date.now()
+    });
+    
+    // Ensure flatmate persists through phase changes
+    const flatmateRoom = this.game.registry.get('flatmateRoom');
+    if (flatmateRoom) {
+      console.log(`Phase change: Flatmate should remain in ${flatmateRoom}`);
+      // Don't destroy flatmate timer during phase changes - let it continue
+    }
+    
+    // Phase-specific logic
+    switch (nextPhase) {
+      case 'morning':
+        this.handleMorningPhase();
+        break;
+      case 'afternoon':
+        this.handleAfternoonPhase();
+        break;
+      case 'evening':
+        this.handleEveningPhase();
+        break;
+      case 'night':
+        this.handleNightPhase();
+        break;
+    }
+    
+    // Save game state to registry
+    this.game.registry.set('gameState', this.gameState);
+    
+    // Notify all other room scenes about the phase change
+    BaseRoomScene.allRoomScenes.forEach(scene => {
+      if (scene !== this && scene.scene && scene.scene.isActive()) {
+        try {
+          scene.currentPhase = nextPhase;
+          scene.gameState.currentPhase = nextPhase;
+          
+          // Update phase label if it exists
+          if (scene.phaseLabel && scene.phaseLabel.active) {
+            const phaseNames = {
+              morning: 'MORNING',
+              afternoon: 'AFTERNOON', 
+              evening: 'EVENING',
+              night: 'NIGHT'
+            };
+            scene.phaseLabel.setText(`DAY 1: ${phaseNames[nextPhase]}`);
+          }
+          
+          // Reset timer if it exists
+          if (scene.timer && scene.timer.active) {
+            scene.timer.reset(60);
+            scene.timer.start();
+          }
+          
+          // Re-spawn flatmate if needed
+          scene.spawnFlatmateIfNeeded();
+        } catch (error) {
+          console.warn('Could not update phase in scene:', error);
+        }
+      }
+    });
+  }
+
+  private handleMorningPhase() {
+    console.log('Starting morning phase - spawning messes');
+    // Morning: Spawn messes
+    this.spawnRandomMess();
+    this.spawnRandomMess();
+    this.spawnRandomMess();
+  }
+
+  private handleAfternoonPhase() {
+    console.log('Starting afternoon phase - spawning messes and broken items');
+    // Afternoon: Spawn messes and broken items
+    this.spawnRandomMess();
+    this.spawnRandomMess();
+    this.spawnRandomBrokenItem();
+  }
+
+  private handleEveningPhase() {
+    console.log('Starting evening phase - increased flatmate activity');
+    // Evening: Increased flatmate rage
+    this.gameState.flatmateRage += 15;
+    this.spawnRandomMess();
+  }
+
+  private handleNightPhase() {
+    console.log('Starting night phase - final phase');
+    // Night: Final phase, prepare for day summary
+    this.gameState.flatmateRage += 20;
+    this.spawnRandomMess();
+    this.spawnRandomBrokenItem();
+  }
+
+  private showDaySummary() {
+    console.log('Showing day summary');
+    
+    // Calculate performance stats
+    const performanceStats = {
+      messesCleaned: this.gameState.messesCleaned,
+      itemsFixed: this.gameState.brokenItemsFixed,
+      finalMood: this.gameState.playerMood,
+      finalCleanliness: this.gameState.cleanliness,
+      finalRage: this.gameState.flatmateRage,
+      finalHealth: this.gameState.playerHealth,
+      coinsEarned: this.gameState.messesCleaned * 10 + this.gameState.brokenItemsFixed * 20
+    };
+    
+    // Store stats in registry for other scenes to access
+    this.game.registry.set('daySummaryStats', performanceStats);
+    
+    // Transition to day summary scene
+    this.scene.start('DaySummaryScene');
   }
 } 

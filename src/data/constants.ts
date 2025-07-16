@@ -17,8 +17,8 @@ export const PHASES = {
 } as const;
 
 export const SPAWN_CONFIG = {
-  MORNING: { messes: 3, brokenItems: 0 },
-  AFTERNOON: { messes: 3, brokenItems: 3 },
+  MORNING: { messes: 8, brokenItems: 0 },
+  AFTERNOON: { messes: 6, brokenItems: 3 },
   EVENING: { messes: 4, brokenItems: 4 },
   NIGHT: { messes: 0, brokenItems: 0 }
 };

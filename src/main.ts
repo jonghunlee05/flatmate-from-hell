@@ -3,7 +3,6 @@ import BootScene from './scenes/BootScene';
 import HomeScene from './scenes/HomeScene';
 import FlatmateSelectScene from './scenes/FlatmateSelectScene';
 import StoryModeScene from './scenes/StoryModeScene';
-import GameScene from './scenes/GameScene';
 import DaySummaryScene from './scenes/DaySummaryScene';
 import EndlessModeScene from './scenes/EndlessModeScene';
 import StoreScene from './scenes/StoreScene';
@@ -28,7 +27,6 @@ const config: Phaser.Types.Core.GameConfig = {
         HomeScene,
         FlatmateSelectScene,
         StoryModeScene,
-        GameScene,
         DaySummaryScene,
         EndlessModeScene,
         StoreScene,

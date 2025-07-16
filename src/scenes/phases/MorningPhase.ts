@@ -24,15 +24,18 @@ export default class MorningPhase {
   private nextMessTime: number = 0;
   private moodDelta: number = 0;
   private complete: boolean = false;
+  private messesSpawned: number = 0;
+  private maxMesses: number = 8; // Morning: 8 messes total
 
   constructor(opts: MorningPhaseOptions) {
     this.scene = opts.scene;
     this.moodBar = opts.moodBar;
     this.timer = opts.timer;
     this.messTimer = 0;
-    this.nextMessTime = Phaser.Math.Between(5000, 8000);
+    this.nextMessTime = Phaser.Math.Between(3000, 6000); // Faster spawning
     this.complete = false;
     this.moodDelta = 0;
+    this.messesSpawned = 0;
     this.timer.start();
     this.timer.on('complete', () => {
       this.complete = true;
@@ -41,13 +44,15 @@ export default class MorningPhase {
 
   update(time: number, delta: number) {
     if (this.complete) return;
-    // Mess spawning
+    
+    // Mess spawning - spawn messes throughout the 60-second phase
     this.messTimer += delta;
-    if (this.messTimer > this.nextMessTime) {
+    if (this.messTimer > this.nextMessTime && this.messesSpawned < this.maxMesses) {
       this.spawnMess();
       this.messTimer = 0;
-      this.nextMessTime = Phaser.Math.Between(5000, 8000);
+      this.nextMessTime = Phaser.Math.Between(3000, 6000);
     }
+    
     // Mess logic
     const now = this.scene.time.now;
     for (const mess of this.messes) {
@@ -88,6 +93,7 @@ export default class MorningPhase {
       mess.holdStart = undefined;
     });
     this.messes.push(mess);
+    this.messesSpawned++;
   }
 
   isComplete() {

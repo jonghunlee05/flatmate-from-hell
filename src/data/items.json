@@ -1,3 +1,160 @@
 {
-  "items": []
+  "furniture": {
+    "Kitchen": [
+      {
+        "id": "stove",
+        "name": "STOVE",
+        "x": 200,
+        "y": 200,
+        "width": 80,
+        "height": 60,
+        "color": "0x333333"
+      },
+      {
+        "id": "fridge",
+        "name": "FRIDGE",
+        "x": 600,
+        "y": 200,
+        "width": 80,
+        "height": 120,
+        "color": "0xffffff"
+      },
+      {
+        "id": "sink",
+        "name": "SINK",
+        "x": 400,
+        "y": 300,
+        "width": 100,
+        "height": 60,
+        "color": "0xcccccc"
+      }
+    ],
+    "Living Room": [
+      {
+        "id": "couch",
+        "name": "COUCH",
+        "x": 200,
+        "y": 200,
+        "width": 150,
+        "height": 80,
+        "color": "0x8B4513"
+      },
+      {
+        "id": "tv",
+        "name": "TV",
+        "x": 600,
+        "y": 200,
+        "width": 100,
+        "height": 60,
+        "color": "0x000000"
+      },
+      {
+        "id": "table",
+        "name": "TABLE",
+        "x": 400,
+        "y": 300,
+        "width": 80,
+        "height": 50,
+        "color": "0x654321"
+      }
+    ],
+    "Your Bedroom": [
+      {
+        "id": "bed",
+        "name": "BED",
+        "x": 200,
+        "y": 200,
+        "width": 120,
+        "height": 80,
+        "color": "0x8B4513"
+      },
+      {
+        "id": "desk",
+        "name": "DESK",
+        "x": 600,
+        "y": 200,
+        "width": 100,
+        "height": 60,
+        "color": "0x654321"
+      }
+    ],
+    "Flatmate Bedroom": [
+      {
+        "id": "bed",
+        "name": "BED",
+        "x": 200,
+        "y": 200,
+        "width": 120,
+        "height": 80,
+        "color": "0x8B4513"
+      },
+      {
+        "id": "wardrobe",
+        "name": "WARDROBE",
+        "x": 600,
+        "y": 200,
+        "width": 80,
+        "height": 120,
+        "color": "0x654321"
+      }
+    ],
+    "Bathroom": [
+      {
+        "id": "toilet",
+        "name": "TOILET",
+        "x": 200,
+        "y": 200,
+        "width": 60,
+        "height": 80,
+        "color": "0xffffff"
+      },
+      {
+        "id": "sink",
+        "name": "SINK",
+        "x": 400,
+        "y": 200,
+        "width": 80,
+        "height": 60,
+        "color": "0xcccccc"
+      },
+      {
+        "id": "shower",
+        "name": "SHOWER",
+        "x": 600,
+        "y": 200,
+        "width": 80,
+        "height": 100,
+        "color": "0xcccccc"
+      }
+    ],
+    "Laundry": [
+      {
+        "id": "washer",
+        "name": "WASHER",
+        "x": 200,
+        "y": 200,
+        "width": 80,
+        "height": 100,
+        "color": "0xffffff"
+      },
+      {
+        "id": "dryer",
+        "name": "DRYER",
+        "x": 400,
+        "y": 200,
+        "width": 80,
+        "height": 100,
+        "color": "0xffffff"
+      },
+      {
+        "id": "basket",
+        "name": "BASKET",
+        "x": 600,
+        "y": 200,
+        "width": 60,
+        "height": 80,
+        "color": "0x8B4513"
+      }
+    ]
+  }
 } 
