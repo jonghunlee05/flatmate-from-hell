@@ -42,6 +42,13 @@ export default class BootScene extends Phaser.Scene {
             spawnInterval: 5000,
             rooms: ['Your Bedroom', 'Flatmate Bedroom', 'Living Room', 'Kitchen', 'Bathroom', 'Laundry']
         });
+
+        // Clear any existing room data to ensure clean start
+        const rooms = ['Your Bedroom', 'Flatmate Bedroom', 'Living Room', 'Kitchen', 'Bathroom', 'Laundry'];
+        rooms.forEach(room => {
+            this.game.registry.remove(`messes_${room}`);
+            this.game.registry.remove(`brokenItems_${room}`);
+        });
         
         // DISABLED: Global mess spawning timer - messes will be spawned by phase system instead
         // this.time.addEvent({

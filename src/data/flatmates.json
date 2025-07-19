@@ -1,3 +1,43 @@
 {
-  "flatmates": []
+  "flatmates": [
+    {
+      "id": "party_bro",
+      "name": "Party Bro",
+      "quote": "Sleeveless legend of beer",
+      "difficulty": "Easy",
+      "eveningEvents": [
+        "threw a wild party and trashed the living room",
+        "spilled beer all over the kitchen counter",
+        "left empty pizza boxes scattered everywhere",
+        "broke the TV while playing drinking games",
+        "passed out on the couch and made a mess"
+      ]
+    },
+    {
+      "id": "witchcore_girl",
+      "name": "Witchcore Girl",
+      "quote": "Summons things from beyond",
+      "difficulty": "Medium",
+      "eveningEvents": [
+        "summoned a demon that left scorch marks everywhere",
+        "conducted a ritual that stained the walls with mysterious symbols",
+        "brewed a potion that exploded in the kitchen",
+        "summoned spirits that knocked over all the furniture",
+        "created a portal that sucked up half the room's contents"
+      ]
+    },
+    {
+      "id": "startup_guy",
+      "name": "Startup Guy",
+      "quote": "Obsessed with disrupting dishwashing",
+      "difficulty": "Hard",
+      "eveningEvents": [
+        "tested his 'revolutionary' dishwashing app and flooded the kitchen",
+        "conducted a 'disruption workshop' that destroyed the dining table",
+        "demoed his 'smart home' system that malfunctioned and broke everything",
+        "held a 'pitch meeting' that turned into a food fight",
+        "experimented with his 'automated cleaning robot' that went haywire"
+      ]
+    }
+  ]
 } 

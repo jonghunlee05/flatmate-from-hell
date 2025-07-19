@@ -133,26 +133,45 @@ export default class FlatmateSelectScene extends Phaser.Scene {
     this.game.registry.remove('gameState');
     this.game.registry.remove('daySummaryStats');
     this.game.registry.remove('globalTimerState');
+    this.game.registry.remove('timerState');
+    this.game.registry.remove('globalTimer');
     this.game.registry.remove('flatmateRoom');
     this.game.registry.remove('playerX');
     this.game.registry.remove('playerY');
     this.game.registry.remove('fromRoom');
     this.game.registry.remove('showGlobalNotification');
     
-    // Clear all room-specific mess data
+    // Clear all room-specific mess and broken item data
     const rooms = ['Your Bedroom', 'Flatmate Bedroom', 'Living Room', 'Kitchen', 'Bathroom', 'Laundry'];
     rooms.forEach(room => {
       this.game.registry.remove(`messes_${room}`);
+      this.game.registry.remove(`brokenItems_${room}`);
     });
     
-    // Clear static variables
-    BaseRoomScene.allRoomScenes = [];
-    BaseRoomScene.globalMessTimer = 0;
-    BaseRoomScene.lastGlobalSpawnTime = 0;
-    BaseRoomScene.isGlobalTransitioning = false;
+    // Clear static variables (these are now handled by managers)
+    // No need to clear static variables as they're managed by the new system
+    
+    // Clear any exit flags
+    this.game.registry.remove('exitingToMenu');
     
     // Initialize flatmate to Living Room for new game
     this.game.registry.set('flatmateRoom', 'Living Room');
+    
+    // Ensure we start with morning phase
+    this.game.registry.set('gameState', {
+      currentPhase: 'morning',
+      phaseTime: 0,
+      messesSpawned: 0,
+      messesCleaned: 0,
+      brokenItemsSpawned: 0,
+      brokenItemsFixed: 0,
+      playerMood: 100,
+      cleanliness: 100,
+      flatmateRage: 0,
+      playerHealth: 100
+    });
+    
+    console.log('FlatmateSelectScene: Set fresh game state with morning phase');
     console.log('New game: Flatmate initialized to Living Room');
   }
 } 

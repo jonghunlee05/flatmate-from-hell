@@ -17,9 +17,9 @@ export const PHASES = {
 } as const;
 
 export const SPAWN_CONFIG = {
-  MORNING: { messes: 8, brokenItems: 0 },
-  AFTERNOON: { messes: 6, brokenItems: 3 },
-  EVENING: { messes: 4, brokenItems: 4 },
+  MORNING: { messes: 12, brokenItems: 0 },
+  AFTERNOON: { messes: 8, brokenItems: 3 },
+  EVENING: { messes: 0, brokenItems: 0 }, // Evening now uses flatmate events instead of messes
   NIGHT: { messes: 0, brokenItems: 0 }
 };
 

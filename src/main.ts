@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import BootScene from './scenes/BootScene';
 import HomeScene from './scenes/HomeScene';
 import FlatmateSelectScene from './scenes/FlatmateSelectScene';
-import StoryModeScene from './scenes/StoryModeScene';
 import DaySummaryScene from './scenes/DaySummaryScene';
 import EndlessModeScene from './scenes/EndlessModeScene';
 import StoreScene from './scenes/StoreScene';
@@ -26,7 +25,6 @@ const config: Phaser.Types.Core.GameConfig = {
         BootScene,
         HomeScene,
         FlatmateSelectScene,
-        StoryModeScene,
         DaySummaryScene,
         EndlessModeScene,
         StoreScene,

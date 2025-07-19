@@ -25,10 +25,14 @@ export default class Player extends Phaser.GameObjects.Container {
   }
 
   update(time: number, delta: number) {
-    // Apply velocity
+    // Apply velocity with frame rate independence
     const deltaTime = delta / 1000; // Convert to seconds
-    this.x += this.velocityX * deltaTime;
-    this.y += this.velocityY * deltaTime;
+    
+    // Clamp delta time to prevent huge jumps (e.g., when tabbing back to browser)
+    const clampedDelta = Math.min(deltaTime, 1/30); // Max 30 FPS equivalent
+    
+    this.x += this.velocityX * clampedDelta;
+    this.y += this.velocityY * clampedDelta;
 
     // Keep player within bounds
     this.x = Phaser.Math.Clamp(this.x, 16, this.scene.cameras.main.width - 16);
@@ -38,6 +42,11 @@ export default class Player extends Phaser.GameObjects.Container {
   setVelocity(x: number, y: number) {
     this.velocityX = x;
     this.velocityY = y;
+  }
+
+  resetVelocity() {
+    this.velocityX = 0;
+    this.velocityY = 0;
   }
 
   setCurrentRoom(roomIndex: number) {

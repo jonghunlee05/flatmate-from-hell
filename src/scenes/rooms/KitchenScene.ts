@@ -25,6 +25,34 @@ export default class KitchenScene extends BaseRoomScene {
     this.addRoomFurniture();
   }
 
+  protected createDoors(): void {
+    // Create door rectangles
+    this.doorConfigs.forEach(doorConfig => {
+      const door = this.add.rectangle(
+        doorConfig.x + doorConfig.width / 2,
+        doorConfig.y + doorConfig.height / 2,
+        doorConfig.width,
+        doorConfig.height,
+        0x654321,
+        0.8
+      ).setStrokeStyle(2, 0x39ff14);
+      
+      // Add door label
+      this.add.text(
+        doorConfig.x + doorConfig.width / 2,
+        doorConfig.y + doorConfig.height / 2,
+        doorConfig.label,
+        {
+          fontFamily: 'Courier, monospace',
+          fontSize: '12px',
+          color: '#ffffff'
+        }
+      ).setOrigin(0.5);
+      
+      this.doors.push(door);
+    });
+  }
+
   private addRoomFurniture() {
     // Add a stove
     this.add.rectangle(200, 200, 80, 60, 0x333333, 0.8);

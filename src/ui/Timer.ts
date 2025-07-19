@@ -44,14 +44,30 @@ export default class Timer extends Phaser.GameObjects.Container {
     this.remaining -= delta / 1000;
     if (this.remaining < 0) this.remaining = 0;
     this.timerText.setText(this.formatTime(this.remaining));
-    if (this.remaining <= 0) {
-      this.running = false;
-      this.emit('complete');
-    }
+    // Remove the complete event emission - PhaseManager handles phase transitions
   }
 
   getRemaining() {
     return this.remaining;
+  }
+
+  isRunning() {
+    return this.running;
+  }
+
+  syncWithPhaseManager(remainingTime: number) {
+    // Convert milliseconds to seconds and sync timer
+    this.remaining = remainingTime / 1000;
+    this.timerText.setText(this.formatTime(this.remaining));
+  }
+
+  fastForward(seconds: number): void {
+    console.log(`Timer: Fast-forwarding by ${seconds} seconds`);
+    this.remaining -= seconds;
+    if (this.remaining < 0) {
+      this.remaining = 0;
+    }
+    this.timerText.setText(this.formatTime(this.remaining));
   }
 
   destroy() {
