@@ -25,8 +25,8 @@ export default class EveningPhase {
     if (!this.eventTriggered) {
       this.triggerFlatmateEvent();
       this.eventTriggered = true;
-    }
-  }
+        }
+      }
 
   private triggerFlatmateEvent(): void {
     FlatmateManager.triggerEveningEvent(this.sceneManager);

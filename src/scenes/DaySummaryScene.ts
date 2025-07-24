@@ -190,6 +190,7 @@ export default class DaySummaryScene extends Phaser.Scene {
     
     // Clear all game-related registry data
     this.game.registry.remove('gameState');
+    this.game.registry.remove('phaseManagerState'); // Also clear phase manager state
     this.game.registry.remove('daySummaryStats');
     this.game.registry.remove('globalTimerState');
     this.game.registry.remove('flatmateRoom');

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import Timer from '../ui/Timer';
 import { GameState } from './GameStateManager';
 import { PhaseType } from './PhaseManager';
+import { getAllRoomNames } from '../data/roomConfig';
 
 export default class UIManager {
   private scene: Phaser.Scene;
@@ -212,7 +213,7 @@ export default class UIManager {
       .setStrokeStyle(2, 0x39ff14);
 
     // Room indicators
-    const rooms = ['Your Bedroom', 'Flatmate Bedroom', 'Living Room', 'Kitchen', 'Bathroom', 'Laundry'];
+    const rooms = getAllRoomNames();
     const roomSize = 15;
     const spacing = 20;
     let currentX = minimapX + 20;

@@ -28,7 +28,7 @@ export default class AfternoonPhase {
       maxMesses: 3, // 3 messes total
       maxBrokenItems: 3 // 3 broken items total
     };
-  }
+      }
 
   getPhaseDescription(): string {
     return "Afternoon: Both messes and broken items need attention!";

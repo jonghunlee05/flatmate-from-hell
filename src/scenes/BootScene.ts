@@ -42,7 +42,7 @@ export default class BootScene extends Phaser.Scene {
             spawnInterval: 5000,
             rooms: ['Your Bedroom', 'Flatmate Bedroom', 'Living Room', 'Kitchen', 'Bathroom', 'Laundry']
         });
-
+        
         // Clear any existing room data to ensure clean start
         const rooms = ['Your Bedroom', 'Flatmate Bedroom', 'Living Room', 'Kitchen', 'Bathroom', 'Laundry'];
         rooms.forEach(room => {

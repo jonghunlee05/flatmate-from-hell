@@ -59,5 +59,5 @@ export default class WitchcoreGirl {
     // - Remove some existing messes (sucked into portal)
     // - Add new "portal residue" messes
     // - Maybe break some items with portal damage
-  }
+    }
 } 

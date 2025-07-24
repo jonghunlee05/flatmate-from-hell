@@ -88,7 +88,7 @@ export default class GameStateManager {
     return 0;
   }
 
-  private saveStateToRegistry(): void {
+  saveStateToRegistry(): void {
     this.scene.game.registry.set('gameState', this.gameState);
   }
 

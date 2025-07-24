@@ -57,5 +57,5 @@ export default class PartyBro {
     // TODO: Implement couch mess in Living Room
     // - Spawn mess on/around the couch
     // - Maybe add some broken items nearby
-  }
+    }
 } 

@@ -109,7 +109,7 @@ export default class BrokenItem extends Phaser.GameObjects.Container {
     this.scene.events.emit('itemRepaired', this);
     
     // Destroy immediately
-    this.destroy();
+      this.destroy();
   }
 
   getIsRepairing(): boolean {

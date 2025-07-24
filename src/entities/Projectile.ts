@@ -4,7 +4,7 @@ export default class Projectile extends Phaser.GameObjects.Container {
   private sprite: Phaser.GameObjects.Arc;
   private velocityX: number;
   private velocityY: number;
-  private speed: number = 200; // pixels per second
+  private speed: number = 400; // pixels per second (doubled from 200)
   private lifetime: number = 3000; // 3 seconds
   private startTime: number;
 

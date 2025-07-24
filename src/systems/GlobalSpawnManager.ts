@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { SpawnConfig } from '../scenes/phases/MorningPhase';
 import itemsData from '../data/items.json';
+import { getAllRoomNames, getRandomRoomName } from '../data/roomConfig';
 
 // Global registry for items across all rooms
 export interface GlobalMess {
@@ -205,20 +206,12 @@ export default class GlobalSpawnManager {
   }
 
   private getRandomRoomName(): string {
-    const rooms = ['Your Bedroom', 'Flatmate Bedroom', 'Living Room', 'Kitchen', 'Bathroom', 'Laundry'];
-    return rooms[Math.floor(Math.random() * rooms.length)];
+    return getRandomRoomName();
   }
 
   private getRoomIndex(roomName: string): number {
-    const roomMap: Record<string, number> = {
-      'Your Bedroom': 0,
-      'Flatmate Bedroom': 1,
-      'Living Room': 2,
-      'Kitchen': 3,
-      'Bathroom': 4,
-      'Laundry': 5
-    };
-    return roomMap[roomName] || 0;
+    const rooms = getAllRoomNames();
+    return rooms.indexOf(roomName);
   }
 
   private showGlobalNotification(message: string): void {

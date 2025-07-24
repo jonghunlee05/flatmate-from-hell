@@ -10,6 +10,9 @@ import { COLORS, GAME_CONFIG } from '../../data/constants';
 import itemsData from '../../data/items.json';
 import Mess from '../../entities/Mess';
 import BrokenItem from '../../entities/BrokenItem';
+import { getRoomName } from '../../data/roomConfig';
+import { MathUtils } from '../../utils/MathUtils';
+import { StateManager } from '../../systems/StateManager';
 
 export interface DoorConfig {
   x: number;
@@ -86,8 +89,16 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     // Set player reference for flatmate system (for night phase)
     this.flatmateSystem.setPlayerReference(this.player);
     
+    // Check if night phase is already active and initialize accordingly
+    if (FlatmateSystem.isNightPhaseActive()) {
+      this.flatmateSystem.setNightPhase(true);
+    }
+    
     // Initialize timer with current phase time
     this.uiManager.syncTimerWithPhaseManager(this.phaseManager.getRemainingTime());
+    
+    // Update UI with the current phase (important for room transitions)
+    this.uiManager.updatePhase(this.phaseManager.getCurrentPhase());
   }
 
   private initializeManagers(): void {
@@ -103,6 +114,13 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     this.gameStateManager.setStateChangeCallback((state) => {
       this.uiManager.updateGameState(state);
     });
+    
+    // Sync GameStateManager's current phase with PhaseManager's loaded state
+    const currentPhase = this.phaseManager.getCurrentPhase();
+    this.gameStateManager.setCurrentPhase(currentPhase as 'morning' | 'afternoon' | 'evening' | 'night');
+    
+    // Save the synced state to registry to ensure consistency
+    this.gameStateManager.saveStateToRegistry();
 
     // Initialize Flatmate System
     this.flatmateSystem = new FlatmateSystem(this, this.scene.manager);
@@ -167,13 +185,22 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     this.game.events.on('showNotification', (message: string) => {
       this.uiManager.showNotification(message);
     });
+
+    // Listen for player hit events from flatmate projectiles
+    this.events.on('playerHit', (data: { damage: number; newHealth: number }) => {
+      this.uiManager.showNotification(`💥 Hit by flatmate! -${data.damage} Health`, 2000);
+      
+      // Update game state manager
+      this.gameStateManager.onPlayerHit();
+    });
   }
 
   private onPhaseTransition(event: any): void {
-    // console.log(`Phase transition: ${event.fromPhase} → ${event.toPhase}`);
-    
     // Update UI
     this.uiManager.updatePhase(event.toPhase);
+    
+    // Update GameStateManager's current phase to match PhaseManager
+    this.gameStateManager.setCurrentPhase(event.toPhase as 'morning' | 'afternoon' | 'evening' | 'night');
     
     // Update spawn config for new phase from PhaseManager
     const newConfig = this.phaseManager.getCurrentSpawnConfig();
@@ -211,6 +238,7 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
       GlobalSpawnManager.clearGlobalRegistry();
       this.messItemManager.reset();
       this.phaseManager.reset(); // Reset PhaseManager for new day
+      this.phaseManager.saveState(); // Save the reset state
       this.showDaySummary();
     }
   }
@@ -353,8 +381,11 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     let playerX: number;
     let playerY: number;
     
+    // Get state manager
+    const stateManager = StateManager.getInstance(this);
+    
     // Check if we have door transition information
-    const fromDoor = this.game.registry.get('fromDoor');
+    const fromDoor = stateManager.getFromDoor();
     
     if (fromDoor) {
       // We came from another room, find the door in this room that leads back to where we came from
@@ -367,7 +398,7 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
         playerX = correspondingDoor.x + correspondingDoor.width / 2;
         playerY = correspondingDoor.y + correspondingDoor.height / 2;
         // console.log(`Player spawning at door: ${playerX}, ${playerY} for door to ${correspondingDoor.targetRoom}`);
-    } else {
+      } else {
         // Fallback to center if no matching door found
         playerX = this.cameras.main.width / 2;
         playerY = this.cameras.main.height / 2;
@@ -375,11 +406,12 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
       }
       
       // Clear the fromDoor data after using it
-      this.game.registry.remove('fromDoor');
+      stateManager.clearFromDoor();
     } else {
       // No door transition, use saved position or default to center
-      playerX = this.game.registry.get('playerX') || this.cameras.main.width / 2;
-      playerY = this.game.registry.get('playerY') || this.cameras.main.height / 2;
+      const playerPosition = stateManager.getPlayerPosition();
+      playerX = playerPosition.x;
+      playerY = playerPosition.y;
     }
     
     this.player = new Player(this, playerX, playerY);
@@ -416,8 +448,8 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     
     for (let i = 0; i < this.doorConfigs.length; i++) {
       const door = this.doorConfigs[i];
-      const distance = Phaser.Math.Distance.Between(
-          this.player.x, this.player.y,
+      const distance = MathUtils.distance(
+        this.player.x, this.player.y,
         door.x + door.width / 2, door.y + door.height / 2
       );
 
@@ -459,8 +491,8 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
 
     // Check if player is near any mess
     for (const mess of messes) {
-      const distance = Phaser.Math.Distance.Between(
-          this.player.x, this.player.y,
+      const distance = MathUtils.distance(
+        this.player.x, this.player.y,
         mess.x, mess.y
       );
 
@@ -501,7 +533,7 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     // Check for broken item interactions
     const brokenItems = this.messItemManager.getBrokenItems();
     for (const item of brokenItems) {
-      const distance = Phaser.Math.Distance.Between(
+      const distance = MathUtils.distance(
         this.player.x, this.player.y,
         item.x, item.y
       );
@@ -604,16 +636,19 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
   }
 
   private saveRoomState(): void {
+    // Get state manager
+    const stateManager = StateManager.getInstance(this);
+    
     // Save player position
-    this.game.registry.set('playerX', this.player.x);
-    this.game.registry.set('playerY', this.player.y);
+    stateManager.setPlayerPosition(this.player.x, this.player.y);
     
     // Save game state
-    this.game.registry.set('gameState', this.gameStateManager.getState());
+    const gameState = this.gameStateManager.getState();
+    stateManager.setGameState(gameState);
     
     // Save timer state
     if (this.uiManager.getTimer()) {
-      this.game.registry.set('timerState', {
+      stateManager.setTimerState({
         remaining: this.uiManager.getTimer().getRemaining(),
         running: this.uiManager.getTimer().isRunning()
       });
@@ -640,7 +675,7 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     
     // Test on nearest mess
     for (const mess of messes) {
-      const distance = Phaser.Math.Distance.Between(
+      const distance = MathUtils.distance(
         this.player.x, this.player.y,
         mess.x, mess.y
       );
@@ -648,13 +683,13 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
       if (distance < 100) {
         // console.log(`Testing progress bar on mess at (${mess.x}, ${mess.y})`);
         (mess as any).testShowProgressBar();
-      return;
-    }
+        return;
+      }
     }
     
     // Test on nearest broken item
     for (const item of brokenItems) {
-      const distance = Phaser.Math.Distance.Between(
+      const distance = MathUtils.distance(
         this.player.x, this.player.y,
         item.x, item.y
       );
@@ -761,8 +796,8 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     
     do {
       // Position near player with some randomness
-      testX = this.player.x + Phaser.Math.Between(-30, 30);
-      testY = this.player.y + Phaser.Math.Between(-30, 30);
+      testX = this.player.x + MathUtils.random(-30, 30);
+      testY = this.player.y + MathUtils.random(-30, 30);
       attempts++;
     } while (this.isPositionOverlappingFurniture(testX, testY) && attempts < maxAttempts);
 
@@ -811,13 +846,14 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
   }
 
   private skipToNextPhase(): void {
-    console.log('ADMIN: Skipping to next phase...');
-    
     // Show admin notification
     this.uiManager.showNotification('ADMIN: Phase skipped!', 3000);
     
     // Force phase transition
     this.phaseManager.forceNextPhase();
+    
+    // Immediately save the phase state to prevent it from resetting on room change
+    this.phaseManager.saveState();
   }
 
   private fastForward10Seconds(): void {
@@ -831,6 +867,9 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     
     // Sync the UI timer with the phase manager
     this.uiManager.syncTimerWithPhaseManager(this.phaseManager.getRemainingTime());
+    
+    // Immediately save the phase state to prevent it from resetting on room change
+    this.phaseManager.saveState();
   }
 
   private getSelectedFlatmate(): any {
@@ -857,6 +896,9 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     
     // Clean up UI manager
     this.uiManager.destroy();
+    
+    // Clean up flatmate system
+    this.flatmateSystem.destroy();
     
     // Reset managers
     this.phaseManager.reset();

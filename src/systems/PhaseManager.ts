@@ -110,29 +110,28 @@ export default class PhaseManager {
 
   // Save state to registry
   saveState(): void {
-    this.scene.game.registry.set('phaseManagerState', {
+    const state = {
       currentPhase: this.currentPhase,
       phaseTimer: this.phaseTimer
-    });
+    };
+    this.scene.game.registry.set('phaseManagerState', state);
   }
 
   // Load state from registry
   loadState(): void {
     const state = this.scene.game.registry.get('phaseManagerState');
     if (state) {
-      console.log(`Loading PhaseManager state: ${state.currentPhase}, timer: ${state.phaseTimer}ms`);
       this.currentPhase = state.currentPhase;
       this.phaseTimer = state.phaseTimer;
-    } else {
-      console.log('No PhaseManager state found, starting fresh');
     }
   }
 
   reset(): void {
     this.currentPhase = 'morning';
     this.phaseTimer = 0;
-    // Clear saved state
+    // Clear saved state and save the reset state
     this.scene.game.registry.remove('phaseManagerState');
+    this.saveState(); // Save the reset state immediately
   }
 
   forcePhaseTransition(): void {

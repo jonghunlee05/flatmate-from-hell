@@ -98,5 +98,5 @@ export default class FlatmateManager {
   private static executeStartupGuyEvent(scene: Phaser.Scene, eventDescription: string): void {
     // TODO: Fix StartupGuy import issue
     console.log('Startup Guy event would execute:', eventDescription);
-  }
+    }
 } 
