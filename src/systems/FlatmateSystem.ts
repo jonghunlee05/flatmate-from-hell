@@ -25,6 +25,7 @@ export interface DoorConfig {
 }
 
 export default class FlatmateSystem {
+  private static instance: FlatmateSystem;
   private scene: Phaser.Scene;
   private sceneManager: Phaser.Scenes.SceneManager;
   private flatmateSprite?: Phaser.GameObjects.Arc;
@@ -65,18 +66,22 @@ export default class FlatmateSystem {
   // Centralized timer management
   private timerManager: TimerManager;
   private stateManager: StateManager;
+  private flatmateMoveTimer?: Phaser.Time.TimerEvent;
 
-  constructor(scene: Phaser.Scene, sceneManager: Phaser.Scenes.SceneManager) {
+  private constructor(scene: Phaser.Scene, sceneManager: Phaser.Scenes.SceneManager) {
     this.scene = scene;
     this.sceneManager = sceneManager;
     this.timerManager = TimerManager.getInstance(scene);
     this.stateManager = StateManager.getInstance(scene);
     this.currentRoom = this.stateManager.getFlatmateRoom();
     
+    console.log(`FlatmateSystem initialized - Scene: ${scene.scene.key}, Initial room: ${this.currentRoom}`);
+    
     // Ensure flatmate doesn't start in player's bedroom
     if (this.currentRoom === 'Your Bedroom') {
       this.currentRoom = 'Living Room';
       this.stateManager.setFlatmateRoom('Living Room');
+      console.log('Flatmate moved from Your Bedroom to Living Room');
     }
     
     // Check if night phase is already active globally
@@ -87,6 +92,24 @@ export default class FlatmateSystem {
     
     // Start the movement timer immediately (for random movement when not chasing)
     this.scheduleFlatmateMove();
+    
+    console.log('FlatmateSystem initialization complete');
+    console.log(`Final flatmate room: ${this.currentRoom}`);
+  }
+
+  static getInstance(scene: Phaser.Scene, sceneManager: Phaser.Scenes.SceneManager): FlatmateSystem {
+    if (!FlatmateSystem.instance) {
+      FlatmateSystem.instance = new FlatmateSystem(scene, sceneManager);
+    } else {
+      // Update scene reference for existing instance
+      FlatmateSystem.instance.updateScene(scene);
+    }
+    return FlatmateSystem.instance;
+  }
+
+  private updateScene(scene: Phaser.Scene): void {
+    this.scene = scene;
+    console.log(`FlatmateSystem scene updated to: ${scene.scene.key}`);
   }
 
   update(delta: number): void {
@@ -97,24 +120,40 @@ export default class FlatmateSystem {
   }
 
   spawnFlatmateIfNeeded(roomName: string): void {
-    const flatmateRoom = this.scene.registry.get('flatmateRoom') || 'Living Room';
+    const flatmateRoom = this.stateManager.getFlatmateRoom();
+    
+    console.log(`Checking flatmate spawn - Current room: ${roomName}, Flatmate room: ${flatmateRoom}`);
+    console.log(`Flatmate sprite exists: ${!!this.flatmateSprite}`);
     
     // Only spawn if this is the flatmate's current room
     if (roomName !== flatmateRoom) {
+      console.log(`Room mismatch - removing flatmate from ${roomName}`);
       this.removeFlatmate();
       return;
     }
 
     // Spawn flatmate if not already present
     if (!this.flatmateSprite) {
+      console.log(`Spawning flatmate in ${roomName}`);
       this.createFlatmateSprite();
       // Don't schedule another timer - it's already running globally
+    } else {
+      console.log(`Flatmate already exists in ${roomName}`);
+    }
+    
+    // Debug: Force spawn for testing if still no flatmate
+    if (!this.flatmateSprite && roomName === flatmateRoom) {
+      console.log('FORCE SPAWNING flatmate for testing');
+      this.createFlatmateSprite();
     }
   }
 
   private createFlatmateSprite(): void {
+    console.log('Creating flatmate sprite');
+    
     // Create flatmate as a red circle
     this.flatmateSprite = this.scene.add.circle(200, 200, 15, 0xff0000);
+    console.log(`Flatmate sprite created at (${this.flatmateSprite.x}, ${this.flatmateSprite.y})`);
     
     // Add label
     this.flatmateLabel = this.scene.add.text(200, 200, 'FLATMATE', {
@@ -122,9 +161,11 @@ export default class FlatmateSystem {
       fontSize: '12px',
       color: '#ffffff'
     }).setOrigin(0.5);
+    console.log('Flatmate label created');
     
     // Set initial random position
     this.setNewFlatmateTarget();
+    console.log('Flatmate sprite creation complete');
   }
 
   private startChasingSystem(): void {
@@ -159,13 +200,13 @@ export default class FlatmateSystem {
     // Decide whether to chase based on phase, distance, and current behavior
     if (this.shouldChasePlayer()) {
       if (!this.isChasingPlayer) {
-        console.log(`Flatmate starting to chase player in ${this.chaseMode} mode!`);
+        console.log(`Flatmate starting to chase player in ${this.chaseMode} mode! (Night phase: ${this.isNightPhase})`);
         this.isChasingPlayer = true;
         this.startChasingPlayer();
       }
     } else {
       if (this.isChasingPlayer) {
-        console.log('Flatmate stopping chase, returning to random movement');
+        console.log(`Flatmate stopping chase, returning to random movement (Night phase: ${this.isNightPhase})`);
         this.isChasingPlayer = false;
         this.stopChasingPlayer();
       }
@@ -323,8 +364,14 @@ export default class FlatmateSystem {
     const playerRoom = this.getPlayerRoom();
     const flatmateRoom = this.getCurrentRoom();
     
-    // Base chase probability based on phase
-    let baseChaseProbability = this.isNightPhase ? 0.8 : 0.3;
+    // Only chase during night phase
+    if (!this.isNightPhase) {
+      console.log(`shouldChasePlayer: false (day phase - no chasing)`);
+      return false; // No chasing during day phases (morning, afternoon, evening)
+    }
+    
+    // Base chase probability for night phase
+    let baseChaseProbability = 0.8;
     
     // Adjust based on chase mode
     switch (this.chaseMode) {
@@ -353,12 +400,15 @@ export default class FlatmateSystem {
     baseChaseProbability = Math.min(0.95, baseChaseProbability);
     
     // During night phase, always chase if not in same room
-    if (this.isNightPhase && flatmateRoom !== playerRoom) {
+    if (flatmateRoom !== playerRoom) {
+      console.log(`shouldChasePlayer: true (night phase - different rooms)`);
       return true;
     }
     
-    // Apply probability
-    return Math.random() < baseChaseProbability;
+    // Apply probability for same room chasing
+    const shouldChase = Math.random() < baseChaseProbability;
+    console.log(`shouldChasePlayer: ${shouldChase} (night phase - same room, probability: ${baseChaseProbability.toFixed(2)})`);
+    return shouldChase;
   }
 
   private shouldAmbushChase(): boolean {
@@ -499,15 +549,26 @@ export default class FlatmateSystem {
   }
 
   private scheduleFlatmateMove(): void {
-    this.timerManager.removeTimer('flatmateMove');
+    // Clear any existing timer
+    if (this.flatmateMoveTimer) {
+      this.flatmateMoveTimer.destroy();
+    }
 
     console.log('Scheduling flatmate move');
     
-    // Use random timer for movement
-    this.timerManager.addRandomTimer('flatmateMove', 5000, 15000, () => {
+    // Fixed 10 second timer for testing
+    const moveTime = 10000; // 10 seconds
+    
+    console.log(`Flatmate move scheduled for ${moveTime}ms from now`);
+    
+    // Use scene's built-in timer system
+    this.flatmateMoveTimer = this.scene.time.delayedCall(moveTime, () => {
       console.log('Flatmate move timer triggered!');
       this.moveFlatmateToAnotherRoom();
     });
+    
+    // Also log the current scene to make sure we're using the right one
+    console.log(`Timer created in scene: ${this.scene.scene.key}`);
   }
 
   private moveFlatmateToAnotherRoom(): void {
@@ -518,6 +579,7 @@ export default class FlatmateSystem {
     
     console.log(`Flatmate moving from ${currentRoom} to ${nextRoom}`);
     console.log(`Available rooms: ${availableRooms.join(', ')}`);
+    console.log(`Current scene: ${this.scene.scene.key}`);
     
     // Find the door that leads to the target room
     const targetDoor = this.findDoorToRoom(nextRoom);
@@ -528,7 +590,7 @@ export default class FlatmateSystem {
       this.targetDoor = targetDoor;
       this.flatmateTargetX = targetDoor.x + targetDoor.width / 2;
       this.flatmateTargetY = targetDoor.y + targetDoor.height / 2;
-      console.log(`Flatmate moving to door: ${targetDoor.label}`);
+      console.log(`Flatmate moving to door: ${targetDoor.label} at (${this.flatmateTargetX}, ${this.flatmateTargetY})`);
     } else {
       console.warn(`No door found to ${nextRoom}, teleporting instead`);
       // Fallback to teleport if no door found
@@ -537,40 +599,84 @@ export default class FlatmateSystem {
   }
 
   private findDoorToRoom(targetRoom: string): DoorConfig | undefined {
-    // Get door configs from the current scene
-    const currentScene = this.sceneManager.getScene(this.scene.scene.key);
-    if (!currentScene) {
-      console.warn('No current scene found');
-      return undefined;
+    // Get the flatmate's current room
+    const flatmateCurrentRoom = this.stateManager.getFlatmateRoom();
+    console.log(`Flatmate is in: ${flatmateCurrentRoom}, trying to move to: ${targetRoom}`);
+    
+    // Only try to find doors if the flatmate is in the same room as the player
+    const currentSceneRoom = this.getSceneRoomName();
+    if (flatmateCurrentRoom !== currentSceneRoom) {
+      console.log(`Flatmate is in ${flatmateCurrentRoom} but player is in ${currentSceneRoom}, teleporting`);
+      return undefined; // This will trigger teleport
     }
-
-    // Access doorConfigs safely with type checking
-    const sceneWithDoors = currentScene as any;
+    
+    // Access doorConfigs directly from the current scene
+    const sceneWithDoors = this.scene as any;
     if (!sceneWithDoors.doorConfigs) {
       console.warn('No door configs found in current scene');
       return undefined;
     }
 
     const doorConfigs = sceneWithDoors.doorConfigs as DoorConfig[];
-    return doorConfigs.find(door => door.targetRoom === targetRoom);
+    console.log(`Found ${doorConfigs.length} doors in current scene:`);
+    doorConfigs.forEach(door => {
+      console.log(`  - ${door.label} -> ${door.targetRoom}`);
+    });
+    
+    const targetDoor = doorConfigs.find(door => door.targetRoom === targetRoom);
+    
+    if (!targetDoor) {
+      console.warn(`No door found to ${targetRoom} in current scene`);
+    } else {
+      console.log(`Found door to ${targetRoom}: ${targetDoor.label}`);
+    }
+    
+    return targetDoor;
+  }
+
+  private getSceneRoomName(): string {
+    const sceneKey = this.scene.scene.key;
+    switch (sceneKey) {
+      case 'LivingRoomScene': return 'Living Room';
+      case 'KitchenScene': return 'Kitchen';
+      case 'BathroomScene': return 'Bathroom';
+      case 'LaundryScene': return 'Laundry';
+      case 'FlatmateBedroomScene': return 'Flatmate Bedroom';
+      case 'PlayerBedroomScene': return 'Your Bedroom';
+      default: return sceneKey;
+    }
   }
 
   private teleportToRoom(roomName: string): void {
+    const fromRoom = this.currentRoom;
+    
+    console.log(`Teleporting flatmate from ${fromRoom} to ${roomName}`);
+    
     // Update state
     this.stateManager.setFlatmateRoom(roomName);
+    this.currentRoom = roomName;
+    
+    // Remove flatmate from current scene since it's moving to a different room
+    this.removeFlatmate();
     
     // Notify listeners
-    this.onRoomChange?.(this.currentRoom, roomName);
+    this.onRoomChange?.(fromRoom, roomName);
     
     // Schedule next move
     this.scheduleFlatmateMove();
+    
+    console.log(`Flatmate teleported to ${roomName}, next move scheduled`);
   }
 
   private updateFlatmateMovement(delta: number): void {
     if (!this.flatmateSprite) return;
 
     const deltaSeconds = delta / 1000;
-    const moveSpeed = this.isChasingPlayer ? this.chaseSpeed : this.moveSpeed; // Use base speed for normal movement, chase speed when chasing
+    
+    // Add some variation to movement speed for more natural movement
+    const baseSpeed = this.isChasingPlayer ? this.chaseSpeed : this.moveSpeed;
+    const speedVariation = MathUtils.random(0.8, 1.2); // ±20% variation
+    const moveSpeed = baseSpeed * speedVariation;
     
     // Check if we're moving to a door
     if (this.isMovingToDoor && this.targetDoor && this.flatmateTargetX && this.flatmateTargetY) {
@@ -670,8 +776,14 @@ export default class FlatmateSystem {
         this.flatmateSprite.x = clampedPosition.x;
         this.flatmateSprite.y = clampedPosition.y;
       } else {
-        // Reached target, set new one
-        this.setNewFlatmateTarget();
+        // Reached target, pause briefly before setting new one
+        this.flatmateTargetX = undefined;
+        this.flatmateTargetY = undefined;
+        
+        // Schedule a new target after a short pause
+        this.scene.time.delayedCall(MathUtils.random(1000, 3000), () => {
+          this.setNewFlatmateTarget();
+        });
       }
     }
   }
@@ -694,6 +806,9 @@ export default class FlatmateSystem {
     this.flatmateTargetX = undefined;
     this.flatmateTargetY = undefined;
     
+    // Remove flatmate from current scene since it's moving to a different room
+    this.removeFlatmate();
+    
     // Notify listeners
     this.onRoomChange?.(fromRoom, toRoom);
     
@@ -706,17 +821,69 @@ export default class FlatmateSystem {
     }
   }
 
+  private positionFlatmateAtDoor(currentRoom: string, fromRoom: string): void {
+    if (!this.flatmateSprite) return;
+    
+    // Find the door in the current room that leads back to where we came from
+    const sceneWithDoors = this.scene as any;
+    if (!sceneWithDoors.doorConfigs) return;
+    
+    const doorConfigs = sceneWithDoors.doorConfigs as DoorConfig[];
+    const correspondingDoor = doorConfigs.find(door => 
+      door.targetRoom === fromRoom
+    );
+    
+    if (correspondingDoor) {
+      // Position flatmate at the door they should spawn at
+      this.flatmateSprite.x = correspondingDoor.x + correspondingDoor.width / 2;
+      this.flatmateSprite.y = correspondingDoor.y + correspondingDoor.height / 2;
+      console.log(`Flatmate positioned at door: ${correspondingDoor.label}`);
+    } else {
+      // Fallback to center if no matching door found
+      this.flatmateSprite.x = this.scene.cameras.main.width / 2;
+      this.flatmateSprite.y = this.scene.cameras.main.height / 2;
+      console.log('No matching door found, positioning flatmate at center');
+    }
+  }
+
   private setNewFlatmateTarget(): void {
     if (!this.flatmateSprite) return;
     
-    // Set target within room boundaries (with padding)
-    const randomPosition = MathUtils.randomPositionInRoom(
+    // Try to find a good target position (avoid too close to current position)
+    let attempts = 0;
+    const maxAttempts = 10;
+    
+    while (attempts < maxAttempts) {
+      const randomPosition = MathUtils.randomPositionInRoom(
+        this.scene.cameras.main.width,
+        this.scene.cameras.main.height,
+        100
+      );
+      
+      // Check if the target is far enough from current position
+      const distance = MathUtils.distance(
+        this.flatmateSprite.x, this.flatmateSprite.y,
+        randomPosition.x, randomPosition.y
+      );
+      
+      // Only accept targets that are at least 50 pixels away
+      if (distance > 50) {
+        this.flatmateTargetX = randomPosition.x;
+        this.flatmateTargetY = randomPosition.y;
+        return;
+      }
+      
+      attempts++;
+    }
+    
+    // If we couldn't find a good target, just use the last random position
+    const fallbackPosition = MathUtils.randomPositionInRoom(
       this.scene.cameras.main.width,
       this.scene.cameras.main.height,
       100
     );
-    this.flatmateTargetX = randomPosition.x;
-    this.flatmateTargetY = randomPosition.y;
+    this.flatmateTargetX = fallbackPosition.x;
+    this.flatmateTargetY = fallbackPosition.y;
   }
 
   private updateFlatmateLabel(): void {
@@ -726,13 +893,16 @@ export default class FlatmateSystem {
   }
 
   private removeFlatmate(): void {
+    console.log('Removing flatmate sprite and label');
     if (this.flatmateSprite) {
       this.flatmateSprite.destroy();
       this.flatmateSprite = undefined;
+      console.log('Flatmate sprite destroyed');
     }
     if (this.flatmateLabel) {
       this.flatmateLabel.destroy();
       this.flatmateLabel = undefined;
+      console.log('Flatmate label destroyed');
     }
     // Don't destroy the timers - they should run globally
   }
@@ -740,6 +910,9 @@ export default class FlatmateSystem {
   // Cleanup method for when scene is destroyed
   destroy(): void {
     this.timerManager.cleanup();
+    if (this.flatmateMoveTimer) {
+      this.flatmateMoveTimer.destroy();
+    }
     this.removeFlatmate();
   }
 
@@ -753,6 +926,22 @@ export default class FlatmateSystem {
 
   setRoomChangeCallback(callback: (fromRoom: string, toRoom: string) => void): void {
     this.onRoomChange = callback;
+  }
+
+  // Debug method to force spawn flatmate
+  forceSpawnFlatmate(): void {
+    console.log('Force spawning flatmate for debugging');
+    if (!this.flatmateSprite) {
+      this.createFlatmateSprite();
+    } else {
+      console.log('Flatmate already exists');
+    }
+  }
+
+  // Debug method to test movement
+  testMoveToAnotherRoom(): void {
+    console.log('Testing flatmate movement to another room');
+    this.moveFlatmateToAnotherRoom();
   }
 
   reset(): void {

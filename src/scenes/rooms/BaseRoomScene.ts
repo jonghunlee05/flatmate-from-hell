@@ -86,6 +86,12 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     // Spawn flatmate if needed
     this.flatmateSystem.spawnFlatmateIfNeeded(this.roomName);
     
+    // Debug: Force spawn flatmate for testing
+    if (this.roomName === 'Living Room') {
+      console.log('Forcing flatmate spawn in Living Room for testing');
+      this.flatmateSystem.forceSpawnFlatmate();
+    }
+    
     // Set player reference for flatmate system (for night phase)
     this.flatmateSystem.setPlayerReference(this.player);
     
@@ -122,8 +128,9 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     // Save the synced state to registry to ensure consistency
     this.gameStateManager.saveStateToRegistry();
 
-    // Initialize Flatmate System
-    this.flatmateSystem = new FlatmateSystem(this, this.scene.manager);
+    // Initialize Flatmate System (singleton)
+    this.flatmateSystem = FlatmateSystem.getInstance(this, this.scene.manager);
+    console.log('FlatmateSystem initialized in BaseRoomScene');
     this.flatmateSystem.setRoomChangeCallback((fromRoom, toRoom) => {
       // console.log(`Flatmate moved from ${fromRoom} to ${toRoom}`);
     });
@@ -347,6 +354,14 @@ export default abstract class BaseRoomScene extends Phaser.Scene {
     adminSkipKey.on('down', () => {
       console.log('L key pressed - ADMIN: Skipping to next phase');
       this.skipToNextPhase();
+    });
+
+    // Test key for flatmate movement
+    const flatmateTestKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.F);
+    flatmateTestKey.on('down', () => {
+      console.log('F key pressed - Testing flatmate movement');
+      this.flatmateSystem.forceSpawnFlatmate();
+      this.flatmateSystem.testMoveToAnotherRoom();
     });
 
     // Admin key for fast-forwarding 10 seconds
