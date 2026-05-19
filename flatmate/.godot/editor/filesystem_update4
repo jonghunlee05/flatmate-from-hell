@@ -1,0 +1,6 @@
+res://scripts/core/Game.gd
+res://scripts/core/GameManager.gd
+res://scripts/core/Placeholder.gd
+res://scenes/main_menu/MainMenu.tscn
+res://scripts/ui/PauseMenu.gd
+res://scripts/player/Player.gd
