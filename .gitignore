@@ -1,0 +1,35 @@
+# Godot-specific ignores
+.godot/
+*.import
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Build files
+*.so
+*.dll
+*.dylib
+*.exe
+*.pdb
+
+# Node (if using any Node tools)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS files
+*.bak
+*.tmp
