@@ -1,7 +1,13 @@
-[gd_scene load_steps=7 format=3 uid="uid://lobby_main"]
+[gd_scene load_steps=12 format=3 uid="uid://lobby_main"]
 
 [ext_resource type="PackedScene" path="res://scenes/lobby/Player.tscn" id="1_player"]
 [ext_resource type="Script" path="res://scripts/lobby/Lobby.gd" id="2_lobby"]
+[ext_resource type="Texture2D" path="res://assets/sprites/lobby/floor_tile.png" id="3_floor"]
+[ext_resource type="Texture2D" path="res://assets/sprites/lobby/wardrobe.png" id="4_wardrobe"]
+[ext_resource type="Texture2D" path="res://assets/sprites/lobby/upgrade_desk.png" id="5_desk"]
+[ext_resource type="Texture2D" path="res://assets/sprites/lobby/exit_door.png" id="6_door"]
+[ext_resource type="Texture2D" path="res://assets/sprites/lobby/item_shelf.png" id="7_shelf"]
+[ext_resource type="Texture2D" path="res://assets/sprites/lobby/gachapon.png" id="8_gacha"]
 
 [sub_resource type="RectangleShape2D" id="WallShapeTop"]
 size = Vector2(1100, 20)
@@ -18,12 +24,13 @@ size = Vector2(20, 700)
 [node name="Lobby" type="Node2D"]
 script = ExtResource("2_lobby")
 
-[node name="Floor" type="ColorRect" parent="."]
+[node name="Floor" type="TextureRect" parent="."]
 offset_left = 0.0
 offset_top = 0.0
 offset_right = 1100.0
 offset_bottom = 700.0
-color = Color(0.14, 0.11, 0.09, 1)
+texture = ExtResource("3_floor")
+stretch_mode = 1
 
 [node name="WallTop" type="ColorRect" parent="."]
 offset_left = 0.0
@@ -77,65 +84,30 @@ position = Vector2(1090, 350)
 [node name="Col" type="CollisionShape2D" parent="PhysWallRight"]
 shape = SubResource("WallShapeRight")
 
-[node name="CharacterWardrobe" type="ColorRect" parent="."]
-offset_left = 380.0
-offset_top = 25.0
-offset_right = 720.0
-offset_bottom = 95.0
-color = Color(0.3, 0.2, 0.5, 1)
+[node name="CharacterWardrobe" type="Sprite2D" parent="."]
+position = Vector2(550, 100)
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("4_wardrobe")
 
-[node name="WardrobeLabel" type="Label" parent="."]
-offset_left = 390.0
-offset_top = 42.0
-offset_right = 710.0
-offset_bottom = 78.0
-text = "Character Wardrobe"
-horizontal_alignment = 1
+[node name="ItemShelf" type="Sprite2D" parent="."]
+position = Vector2(112, 330)
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("7_shelf")
 
-[node name="ItemShelf" type="ColorRect" parent="."]
-offset_left = 25.0
-offset_top = 240.0
-offset_right = 200.0
-offset_bottom = 420.0
-color = Color(0.15, 0.4, 0.2, 1)
+[node name="UpgradeDesk" type="Sprite2D" parent="."]
+position = Vector2(990, 330)
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("5_desk")
 
-[node name="ItemShelfLabel" type="Label" parent="."]
-offset_left = 25.0
-offset_top = 318.0
-offset_right = 200.0
-offset_bottom = 342.0
-text = "Item Shelf"
-horizontal_alignment = 1
+[node name="ExitDoor" type="Sprite2D" parent="."]
+position = Vector2(1010, 650)
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("6_door")
 
-[node name="UpgradeDesk" type="ColorRect" parent="."]
-offset_left = 900.0
-offset_top = 240.0
-offset_right = 1080.0
-offset_bottom = 420.0
-color = Color(0.5, 0.3, 0.1, 1)
-
-[node name="UpgradeDeskLabel" type="Label" parent="."]
-offset_left = 900.0
-offset_top = 318.0
-offset_right = 1080.0
-offset_bottom = 342.0
-text = "Upgrade Desk"
-horizontal_alignment = 1
-
-[node name="ExitDoor" type="ColorRect" parent="."]
-offset_left = 940.0
-offset_top = 615.0
-offset_right = 1080.0
-offset_bottom = 678.0
-color = Color(0.7, 0.15, 0.1, 1)
-
-[node name="ExitDoorLabel" type="Label" parent="."]
-offset_left = 930.0
-offset_top = 630.0
-offset_right = 1090.0
-offset_bottom = 660.0
-text = "Exit Door"
-horizontal_alignment = 1
+[node name="GachaponMachine" type="Sprite2D" parent="."]
+position = Vector2(550, 575)
+scale = Vector2(1.4, 1.4)
+texture = ExtResource("8_gacha")
 
 [node name="Player" parent="." instance=ExtResource("1_player")]
 position = Vector2(550, 480)
@@ -240,3 +212,341 @@ text = "Yes"
 [node name="BtnNo" type="Button" parent="HUD/SaveConfirm/VBox/HBox"]
 custom_minimum_size = Vector2(120, 44)
 text = "No"
+
+[node name="CharacterSelect" type="PanelContainer" parent="HUD"]
+process_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -480.0
+offset_top = -200.0
+offset_right = 480.0
+offset_bottom = 200.0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="HUD/CharacterSelect"]
+theme_override_constants/separation = 16
+
+[node name="Title" type="Label" parent="HUD/CharacterSelect/VBox"]
+text = "CHARACTER WARDROBE"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+
+[node name="Cards" type="HBoxContainer" parent="HUD/CharacterSelect/VBox"]
+theme_override_constants/separation = 12
+
+[node name="CardIntrovert" type="PanelContainer" parent="HUD/CharacterSelect/VBox/Cards"]
+custom_minimum_size = Vector2(210, 240)
+
+[node name="VBox" type="VBoxContainer" parent="HUD/CharacterSelect/VBox/Cards/CardIntrovert"]
+theme_override_constants/separation = 8
+
+[node name="Sprite" type="TextureRect" parent="HUD/CharacterSelect/VBox/Cards/CardIntrovert/VBox"]
+custom_minimum_size = Vector2(0, 100)
+stretch_mode = 5
+
+[node name="Name" type="Label" parent="HUD/CharacterSelect/VBox/Cards/CardIntrovert/VBox"]
+text = "The Introvert"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 15
+
+[node name="Desc" type="Label" parent="HUD/CharacterSelect/VBox/Cards/CardIntrovert/VBox"]
+custom_minimum_size = Vector2(0, 100)
+text = "Balanced and steady.\nStarts with max Composure bonus."
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="BtnSelect" type="Button" parent="HUD/CharacterSelect/VBox/Cards/CardIntrovert/VBox"]
+text = "SELECT"
+
+[node name="CardPetty" type="PanelContainer" parent="HUD/CharacterSelect/VBox/Cards"]
+custom_minimum_size = Vector2(210, 240)
+
+[node name="VBox" type="VBoxContainer" parent="HUD/CharacterSelect/VBox/Cards/CardPetty"]
+theme_override_constants/separation = 8
+
+[node name="Sprite" type="TextureRect" parent="HUD/CharacterSelect/VBox/Cards/CardPetty/VBox"]
+custom_minimum_size = Vector2(0, 100)
+stretch_mode = 5
+
+[node name="Name" type="Label" parent="HUD/CharacterSelect/VBox/Cards/CardPetty/VBox"]
+text = "The Petty One"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 15
+
+[node name="Desc" type="Label" parent="HUD/CharacterSelect/VBox/Cards/CardPetty/VBox"]
+custom_minimum_size = Vector2(0, 100)
+text = "Weaker stats, but earns\n2x Rent per run."
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="BtnSelect" type="Button" parent="HUD/CharacterSelect/VBox/Cards/CardPetty/VBox"]
+text = "SELECT"
+
+
+[node name="CardPeacekeeper" type="PanelContainer" parent="HUD/CharacterSelect/VBox/Cards"]
+custom_minimum_size = Vector2(210, 240)
+
+[node name="VBox" type="VBoxContainer" parent="HUD/CharacterSelect/VBox/Cards/CardPeacekeeper"]
+theme_override_constants/separation = 8
+
+[node name="Sprite" type="TextureRect" parent="HUD/CharacterSelect/VBox/Cards/CardPeacekeeper/VBox"]
+custom_minimum_size = Vector2(0, 100)
+stretch_mode = 5
+
+[node name="Name" type="Label" parent="HUD/CharacterSelect/VBox/Cards/CardPeacekeeper/VBox"]
+text = "The Peacekeeper"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 15
+
+[node name="Desc" type="Label" parent="HUD/CharacterSelect/VBox/Cards/CardPeacekeeper/VBox"]
+custom_minimum_size = Vector2(0, 100)
+text = "Heals Composure on\nnon-combat resolutions."
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="BtnSelect" type="Button" parent="HUD/CharacterSelect/VBox/Cards/CardPeacekeeper/VBox"]
+text = "SELECT"
+
+
+[node name="CardChaos" type="PanelContainer" parent="HUD/CharacterSelect/VBox/Cards"]
+custom_minimum_size = Vector2(210, 240)
+
+[node name="VBox" type="VBoxContainer" parent="HUD/CharacterSelect/VBox/Cards/CardChaos"]
+theme_override_constants/separation = 8
+
+[node name="Sprite" type="TextureRect" parent="HUD/CharacterSelect/VBox/Cards/CardChaos/VBox"]
+custom_minimum_size = Vector2(0, 100)
+stretch_mode = 5
+
+[node name="Name" type="Label" parent="HUD/CharacterSelect/VBox/Cards/CardChaos/VBox"]
+text = "The Chaos Goblin"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 15
+
+[node name="Desc" type="Label" parent="HUD/CharacterSelect/VBox/Cards/CardChaos/VBox"]
+custom_minimum_size = Vector2(0, 100)
+text = "Random buff each phase.\nUnpredictable but fun."
+autowrap_mode = 3
+horizontal_alignment = 1
+
+[node name="BtnSelect" type="Button" parent="HUD/CharacterSelect/VBox/Cards/CardChaos/VBox"]
+text = "SELECT"
+
+
+[node name="BtnClose" type="Button" parent="HUD/CharacterSelect/VBox"]
+custom_minimum_size = Vector2(0, 40)
+text = "Close"
+
+[node name="InventoryBar" type="HBoxContainer" parent="HUD"]
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -170.0
+offset_top = -62.0
+offset_right = 170.0
+offset_bottom = -8.0
+theme_override_constants/separation = 10
+
+[node name="Slot1" type="PanelContainer" parent="HUD/InventoryBar"]
+custom_minimum_size = Vector2(155, 48)
+
+[node name="HBox" type="HBoxContainer" parent="HUD/InventoryBar/Slot1"]
+theme_override_constants/separation = 6
+
+[node name="Icon" type="TextureRect" parent="HUD/InventoryBar/Slot1/HBox"]
+custom_minimum_size = Vector2(32, 32)
+stretch_mode = 5
+visible = false
+
+[node name="Label" type="Label" parent="HUD/InventoryBar/Slot1/HBox"]
+text = "[ empty ]"
+vertical_alignment = 1
+
+[node name="Slot2" type="PanelContainer" parent="HUD/InventoryBar"]
+custom_minimum_size = Vector2(155, 48)
+
+[node name="HBox" type="HBoxContainer" parent="HUD/InventoryBar/Slot2"]
+theme_override_constants/separation = 6
+
+[node name="Icon" type="TextureRect" parent="HUD/InventoryBar/Slot2/HBox"]
+custom_minimum_size = Vector2(32, 32)
+stretch_mode = 5
+visible = false
+
+[node name="Label" type="Label" parent="HUD/InventoryBar/Slot2/HBox"]
+text = "[ empty ]"
+vertical_alignment = 1
+
+[node name="ItemSelect" type="PanelContainer" parent="HUD"]
+process_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -460.0
+offset_top = -260.0
+offset_right = 460.0
+offset_bottom = 260.0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="HUD/ItemSelect"]
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="HUD/ItemSelect/VBox"]
+text = "ITEM SHELF"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+
+[node name="Scroll" type="ScrollContainer" parent="HUD/ItemSelect/VBox"]
+custom_minimum_size = Vector2(880, 380)
+
+[node name="Grid" type="GridContainer" parent="HUD/ItemSelect/VBox/Scroll"]
+columns = 5
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+
+[node name="BtnClose" type="Button" parent="HUD/ItemSelect/VBox"]
+custom_minimum_size = Vector2(0, 40)
+text = "Close"
+
+[node name="SlotPicker" type="PanelContainer" parent="HUD"]
+process_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -210.0
+offset_top = -110.0
+offset_right = 210.0
+offset_bottom = 110.0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="HUD/SlotPicker"]
+theme_override_constants/separation = 14
+
+[node name="Title" type="Label" parent="HUD/SlotPicker/VBox"]
+text = "Replace which slot?"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 16
+
+[node name="HBox" type="HBoxContainer" parent="HUD/SlotPicker/VBox"]
+theme_override_constants/separation = 12
+
+[node name="BtnSlot1" type="Button" parent="HUD/SlotPicker/VBox/HBox"]
+custom_minimum_size = Vector2(170, 48)
+text = "Slot 1"
+
+[node name="BtnSlot2" type="Button" parent="HUD/SlotPicker/VBox/HBox"]
+custom_minimum_size = Vector2(170, 48)
+text = "Slot 2"
+
+[node name="BtnCancel" type="Button" parent="HUD/SlotPicker/VBox"]
+custom_minimum_size = Vector2(0, 40)
+text = "Cancel"
+
+[node name="GachaPanel" type="PanelContainer" parent="HUD"]
+process_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -220.0
+offset_top = -250.0
+offset_right = 220.0
+offset_bottom = 250.0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="HUD/GachaPanel"]
+theme_override_constants/separation = 10
+
+[node name="Title" type="Label" parent="HUD/GachaPanel/VBox"]
+text = "GACHAPON"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 22
+
+[node name="CostLabel" type="Label" parent="HUD/GachaPanel/VBox"]
+text = "Spend rent for a random item — anything goes."
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 12
+
+[node name="StatusLabel" type="Label" parent="HUD/GachaPanel/VBox"]
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 13
+
+[node name="BtnRoll" type="Button" parent="HUD/GachaPanel/VBox"]
+custom_minimum_size = Vector2(200, 48)
+text = "ROLL!"
+
+[node name="ResultPanel" type="VBoxContainer" parent="HUD/GachaPanel/VBox"]
+theme_override_constants/separation = 6
+visible = false
+
+[node name="ResultIcon" type="TextureRect" parent="HUD/GachaPanel/VBox/ResultPanel"]
+custom_minimum_size = Vector2(80, 80)
+stretch_mode = 5
+
+[node name="ResultName" type="Label" parent="HUD/GachaPanel/VBox/ResultPanel"]
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 17
+
+[node name="ResultType" type="Label" parent="HUD/GachaPanel/VBox/ResultPanel"]
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 11
+theme_override_colors/font_color = Color(0.7, 0.7, 0.7, 1)
+
+[node name="ResultRarity" type="Label" parent="HUD/GachaPanel/VBox/ResultPanel"]
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 13
+
+[node name="ResultDesc" type="Label" parent="HUD/GachaPanel/VBox/ResultPanel"]
+custom_minimum_size = Vector2(380, 40)
+autowrap_mode = 3
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 11
+
+[node name="BtnGachaPickup" type="Button" parent="HUD/GachaPanel/VBox/ResultPanel"]
+custom_minimum_size = Vector2(0, 40)
+text = "PICK UP"
+
+[node name="BtnGachaClose" type="Button" parent="HUD/GachaPanel/VBox"]
+custom_minimum_size = Vector2(0, 40)
+text = "Close"
+
+[node name="DropConfirm" type="PanelContainer" parent="HUD"]
+process_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -135.0
+offset_top = -80.0
+offset_right = 135.0
+offset_bottom = 80.0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="HUD/DropConfirm"]
+theme_override_constants/separation = 14
+
+[node name="Label" type="Label" parent="HUD/DropConfirm/VBox"]
+text = "Drop item?"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 15
+
+[node name="HBox" type="HBoxContainer" parent="HUD/DropConfirm/VBox"]
+theme_override_constants/separation = 10
+
+[node name="BtnDrop" type="Button" parent="HUD/DropConfirm/VBox/HBox"]
+custom_minimum_size = Vector2(110, 44)
+text = "Drop"
+
+[node name="BtnKeep" type="Button" parent="HUD/DropConfirm/VBox/HBox"]
+custom_minimum_size = Vector2(110, 44)
+text = "Keep"
