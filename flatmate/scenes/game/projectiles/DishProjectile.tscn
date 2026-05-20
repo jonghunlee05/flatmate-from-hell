@@ -1,0 +1,16 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/enemy/DishProjectile.gd" id="1_dish"]
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_dish"]
+radius = 8.0
+
+[node name="root" type="Area2D" unique_id=1854227494]
+script = ExtResource("1_dish")
+collision_layer = 8
+collision_mask = 2
+
+[node name="AnimatedSprite2D" type="AnimatedSprite2D" parent="." unique_id=7000000001]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=7000000002]
+shape = SubResource("CircleShape2D_dish")

@@ -1,4 +1,4 @@
-# Godot 4 gitignore
+# Godot 4
 .godot/
 *.translation
 export_presets.cfg
@@ -7,3 +7,30 @@ export_presets.cfg
 # OS
 .DS_Store
 Thumbs.db
+*.bak
+*.tmp
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.sublime-project
+*.sublime-workspace
+
+# Build
+*.so
+*.dll
+*.dylib
+*.exe
+*.pdb
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Python
+__pycache__/
+*.py[cod]
