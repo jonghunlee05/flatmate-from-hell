@@ -1,0 +1,242 @@
+[gd_scene load_steps=7 format=3 uid="uid://lobby_main"]
+
+[ext_resource type="PackedScene" path="res://scenes/lobby/Player.tscn" id="1_player"]
+[ext_resource type="Script" path="res://scripts/lobby/Lobby.gd" id="2_lobby"]
+
+[sub_resource type="RectangleShape2D" id="WallShapeTop"]
+size = Vector2(1100, 20)
+
+[sub_resource type="RectangleShape2D" id="WallShapeBottom"]
+size = Vector2(1100, 20)
+
+[sub_resource type="RectangleShape2D" id="WallShapeLeft"]
+size = Vector2(20, 700)
+
+[sub_resource type="RectangleShape2D" id="WallShapeRight"]
+size = Vector2(20, 700)
+
+[node name="Lobby" type="Node2D"]
+script = ExtResource("2_lobby")
+
+[node name="Floor" type="ColorRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 1100.0
+offset_bottom = 700.0
+color = Color(0.14, 0.11, 0.09, 1)
+
+[node name="WallTop" type="ColorRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 1100.0
+offset_bottom = 20.0
+color = Color(0.3, 0.25, 0.2, 1)
+
+[node name="WallBottom" type="ColorRect" parent="."]
+offset_left = 0.0
+offset_top = 680.0
+offset_right = 1100.0
+offset_bottom = 700.0
+color = Color(0.3, 0.25, 0.2, 1)
+
+[node name="WallLeft" type="ColorRect" parent="."]
+offset_left = 0.0
+offset_top = 0.0
+offset_right = 20.0
+offset_bottom = 700.0
+color = Color(0.3, 0.25, 0.2, 1)
+
+[node name="WallRight" type="ColorRect" parent="."]
+offset_left = 1080.0
+offset_top = 0.0
+offset_right = 1100.0
+offset_bottom = 700.0
+color = Color(0.3, 0.25, 0.2, 1)
+
+[node name="PhysWallTop" type="StaticBody2D" parent="."]
+position = Vector2(550, 10)
+
+[node name="Col" type="CollisionShape2D" parent="PhysWallTop"]
+shape = SubResource("WallShapeTop")
+
+[node name="PhysWallBottom" type="StaticBody2D" parent="."]
+position = Vector2(550, 690)
+
+[node name="Col" type="CollisionShape2D" parent="PhysWallBottom"]
+shape = SubResource("WallShapeBottom")
+
+[node name="PhysWallLeft" type="StaticBody2D" parent="."]
+position = Vector2(10, 350)
+
+[node name="Col" type="CollisionShape2D" parent="PhysWallLeft"]
+shape = SubResource("WallShapeLeft")
+
+[node name="PhysWallRight" type="StaticBody2D" parent="."]
+position = Vector2(1090, 350)
+
+[node name="Col" type="CollisionShape2D" parent="PhysWallRight"]
+shape = SubResource("WallShapeRight")
+
+[node name="CharacterWardrobe" type="ColorRect" parent="."]
+offset_left = 380.0
+offset_top = 25.0
+offset_right = 720.0
+offset_bottom = 95.0
+color = Color(0.3, 0.2, 0.5, 1)
+
+[node name="WardrobeLabel" type="Label" parent="."]
+offset_left = 390.0
+offset_top = 42.0
+offset_right = 710.0
+offset_bottom = 78.0
+text = "Character Wardrobe"
+horizontal_alignment = 1
+
+[node name="ItemShelf" type="ColorRect" parent="."]
+offset_left = 25.0
+offset_top = 240.0
+offset_right = 200.0
+offset_bottom = 420.0
+color = Color(0.15, 0.4, 0.2, 1)
+
+[node name="ItemShelfLabel" type="Label" parent="."]
+offset_left = 25.0
+offset_top = 318.0
+offset_right = 200.0
+offset_bottom = 342.0
+text = "Item Shelf"
+horizontal_alignment = 1
+
+[node name="UpgradeDesk" type="ColorRect" parent="."]
+offset_left = 900.0
+offset_top = 240.0
+offset_right = 1080.0
+offset_bottom = 420.0
+color = Color(0.5, 0.3, 0.1, 1)
+
+[node name="UpgradeDeskLabel" type="Label" parent="."]
+offset_left = 900.0
+offset_top = 318.0
+offset_right = 1080.0
+offset_bottom = 342.0
+text = "Upgrade Desk"
+horizontal_alignment = 1
+
+[node name="ExitDoor" type="ColorRect" parent="."]
+offset_left = 940.0
+offset_top = 615.0
+offset_right = 1080.0
+offset_bottom = 678.0
+color = Color(0.7, 0.15, 0.1, 1)
+
+[node name="ExitDoorLabel" type="Label" parent="."]
+offset_left = 930.0
+offset_top = 630.0
+offset_right = 1090.0
+offset_bottom = 660.0
+text = "Exit Door"
+horizontal_alignment = 1
+
+[node name="Player" parent="." instance=ExtResource("1_player")]
+position = Vector2(550, 480)
+
+[node name="HUD" type="CanvasLayer" parent="."]
+
+[node name="RentLabel" type="Label" parent="HUD"]
+anchors_preset = 0
+offset_left = 20.0
+offset_top = 16.0
+offset_right = 300.0
+offset_bottom = 50.0
+text = "Rent: £0"
+theme_override_font_sizes/font_size = 22
+
+[node name="InteractPrompt" type="Label" parent="HUD"]
+anchors_preset = 7
+anchor_left = 0.5
+anchor_top = 1.0
+anchor_right = 0.5
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_top = -80.0
+offset_right = 150.0
+offset_bottom = -50.0
+text = "Press E to interact"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18
+visible = false
+
+[node name="BtnMenu" type="Button" parent="HUD"]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -140.0
+offset_top = 12.0
+offset_right = -12.0
+offset_bottom = 48.0
+text = "Menu"
+
+[node name="PauseMenu" type="PanelContainer" parent="HUD"]
+process_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -120.0
+offset_top = -110.0
+offset_right = 120.0
+offset_bottom = 110.0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="HUD/PauseMenu"]
+theme_override_constants/separation = 12
+
+[node name="Title" type="Label" parent="HUD/PauseMenu/VBox"]
+text = "MENU"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 20
+
+[node name="BtnResume" type="Button" parent="HUD/PauseMenu/VBox"]
+custom_minimum_size = Vector2(200, 48)
+text = "Resume"
+
+[node name="BtnOptions" type="Button" parent="HUD/PauseMenu/VBox"]
+custom_minimum_size = Vector2(200, 48)
+text = "Options"
+
+[node name="BtnQuit" type="Button" parent="HUD/PauseMenu/VBox"]
+custom_minimum_size = Vector2(200, 48)
+text = "Quit"
+
+[node name="SaveConfirm" type="PanelContainer" parent="HUD"]
+process_mode = 3
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -140.0
+offset_top = -80.0
+offset_right = 140.0
+offset_bottom = 80.0
+visible = false
+
+[node name="VBox" type="VBoxContainer" parent="HUD/SaveConfirm"]
+theme_override_constants/separation = 16
+
+[node name="Label" type="Label" parent="HUD/SaveConfirm/VBox"]
+text = "Save the game?"
+horizontal_alignment = 1
+theme_override_font_sizes/font_size = 18
+
+[node name="HBox" type="HBoxContainer" parent="HUD/SaveConfirm/VBox"]
+theme_override_constants/separation = 12
+
+[node name="BtnYes" type="Button" parent="HUD/SaveConfirm/VBox/HBox"]
+custom_minimum_size = Vector2(120, 44)
+text = "Yes"
+
+[node name="BtnNo" type="Button" parent="HUD/SaveConfirm/VBox/HBox"]
+custom_minimum_size = Vector2(120, 44)
+text = "No"
