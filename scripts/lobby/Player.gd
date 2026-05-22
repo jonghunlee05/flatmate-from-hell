@@ -41,6 +41,7 @@ var _arm_line    : Line2D    = null
 var _weapon_node : Sprite2D  = null
 var _arm_right   := true     # arm pointing right? (weapon flip only)
 var _facing_right := true    # body flip — driven by movement, sticks on idle
+var _last_dir    := Vector2(1.0, 0.0)   # last non-zero input direction, used for dash
 
 var _skill_active   := false   # true while skill animation is playing
 var _skill_cooldown := 0.0     # seconds remaining on cooldown
@@ -68,10 +69,8 @@ func _physics_process(delta: float) -> void:
 		_skill_cd_bar.value = 0.0
 		_skill_cd_label.text = "SPACE"
 
-	# Block movement and new inputs while skill is playing
+	# Skill coroutine owns velocity + move_and_slide — physics_process stays out
 	if _skill_active:
-		velocity = Vector2.ZERO
-		move_and_slide()
 		_update_arm()
 		return
 
@@ -81,6 +80,8 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var direction := _input_dir()
+	if direction != Vector2.ZERO:
+		_last_dir = direction.normalized()
 	velocity = direction.normalized() * SPEED
 	move_and_slide()
 	_update_arm()
@@ -210,7 +211,9 @@ const SLAM_RADIUS      := 90.0    # AOE boundary radius in px
 
 func _play_skill() -> void:
 	_skill_active = true
-	_skill_cooldown = SKILL_COOLDOWN_MAX
+	var cooldowns := {"introvert": 1.0, "goblin": 1.0, "peacekeeper": 8.0, "petty": 1.0}
+	_skill_cooldown = cooldowns.get(RunData.active_character, SKILL_COOLDOWN_MAX)
+	_skill_cd_bar.max_value = _skill_cooldown
 	var sprite := $AnimatedSprite2D
 	sprite.flip_h = not _facing_right
 	sprite.play("skill")
@@ -231,13 +234,13 @@ func _play_skill() -> void:
 	velocity = Vector2.ZERO
 	sprite.play("idle")
 
-# Introvert — forward dash
+# Introvert — forward dash in last movement direction
 func _skill_dash() -> void:
 	var sprite   := $AnimatedSprite2D
-	var dash_dir := Vector2(1.0 if _facing_right else -1.0, 0.0)
+	var dash_dir := _last_dir
 	var elapsed  := 0.0
 	while sprite.is_playing():
-		var delta := get_process_delta_time()
+		var delta := get_physics_process_delta_time()
 		elapsed += delta
 		var spd: float
 		if elapsed < SKILL_DASH_HOLD:
@@ -247,7 +250,7 @@ func _skill_dash() -> void:
 			spd = SKILL_DASH_SPEED * (1.0 - t)
 		velocity = dash_dir * spd
 		move_and_slide()
-		await get_tree().process_frame
+		await get_tree().physics_frame
 
 # Chaos Goblin — ground slam with shadow + landing shake
 func _skill_slam() -> void:
@@ -276,7 +279,7 @@ func _skill_slam() -> void:
 	while sprite.is_playing():
 		var f      : int   = sprite.frame
 		var target : float = jump_targets.get(f, 0.0)
-		var delta          := get_process_delta_time()
+		var delta          := get_physics_process_delta_time()
 
 		# Smooth lerp toward target Y — gentle float up, instant snap on slam
 		var speed  := 8.0 if f < 3 else 999.0
@@ -309,7 +312,7 @@ func _skill_slam() -> void:
 		last_frame = f
 		velocity   = Vector2.ZERO
 		move_and_slide()
-		await get_tree().process_frame
+		await get_tree().physics_frame
 
 	# Reset sprite back to original position
 	sprite.position = sprite_origin
@@ -333,12 +336,12 @@ func _show_slam_ring() -> void:
 	var elapsed := 0.0
 	var duration := 0.5
 	while elapsed < duration:
-		var delta := get_process_delta_time()
+		var delta := get_physics_process_delta_time()
 		elapsed  += delta
 		var t     := elapsed / duration
 		ring.scale         = Vector2.ONE * (1.0 + t * 0.35)
 		ring.modulate.a    = 1.0 - t
-		await get_tree().process_frame
+		await get_tree().physics_frame
 	ring.queue_free()
 
 func _screen_shake(duration: float, strength: float) -> void:
@@ -346,22 +349,140 @@ func _screen_shake(duration: float, strength: float) -> void:
 	var origin  : Vector2 = sprite.position
 	var elapsed := 0.0
 	while elapsed < duration:
-		var delta := get_process_delta_time()
+		var delta := get_physics_process_delta_time()
 		elapsed  += delta
 		var t     := 1.0 - elapsed / duration
 		sprite.position = origin + Vector2(
 			randf_range(-strength, strength) * t,
 			randf_range(-strength, strength) * t)
-		await get_tree().process_frame
+		await get_tree().physics_frame
 	sprite.position = origin
 
-# Peace Keeper — barrier in place (no movement)
+# Peace Keeper — nature mediation: expanding rings, then a persistent barrier aura
 func _skill_barrier() -> void:
 	var sprite := $AnimatedSprite2D
+	var last_frame := -1
+
 	while sprite.is_playing():
 		velocity = Vector2.ZERO
 		move_and_slide()
-		await get_tree().process_frame
+		await get_tree().physics_frame
+
+	_show_persistent_barrier()
+
+func _emit_nature_ring(wave_index: int) -> void:
+	var colours : Array[Color] = [
+		Color(0.2,  0.85, 0.35, 1.0),   # bright green
+		Color(0.35, 0.95, 0.55, 1.0),   # soft mint
+		Color(0.15, 0.75, 0.45, 1.0),   # deep green
+	]
+	var colour : Color = colours[wave_index % colours.size()]
+
+	var ring := Line2D.new()
+	ring.width = 6.0
+	ring.default_color = colour
+	ring.z_index = 2
+	var pts := 48
+	for i in range(pts + 1):
+		var angle := (float(i) / pts) * TAU
+		ring.add_point(Vector2(cos(angle), sin(angle)) * 10.0)
+	ring.position = Vector2(0, 8)
+	add_child(ring)
+
+	# Also spawn a few leaf particles
+	for _i in range(4):
+		_emit_leaf(colour)
+
+	var elapsed  := 0.0
+	var duration := 1.4
+	var max_r    := 180.0 + wave_index * 30.0
+	while elapsed < duration:
+		var delta := get_physics_process_delta_time()
+		elapsed  += delta
+		var t     := elapsed / duration
+		ring.scale      = Vector2.ONE * (lerpf(1.0, max_r / 10.0, t))
+		ring.modulate.a = 1.0 - t
+		ring.width      = lerpf(6.0, 2.0, t)
+		await get_tree().physics_frame
+	ring.queue_free()
+
+func _show_persistent_barrier() -> void:
+	# Pointy-top hexagon stretched on Y to wrap the character silhouette
+	const HEX_RX := 40.0   # horizontal radius
+	const HEX_RY := 68.0   # vertical radius (taller to cover head-to-toe)
+
+	var make_hex := func(rx: float, ry: float) -> PackedVector2Array:
+		var p : PackedVector2Array = []
+		for i in range(6):
+			var a := -PI / 2.0 + i * TAU / 6.0   # start at top point
+			p.append(Vector2(cos(a) * rx, sin(a) * ry))
+		return p
+
+	# Outer soft halo
+	var outer := Polygon2D.new()
+	outer.color   = Color(0.25, 0.92, 0.42, 0.22)
+	outer.polygon = make_hex.call(HEX_RX + 10.0, HEX_RY + 14.0)
+	outer.z_index = 1
+	add_child(outer)
+
+	# Inner tighter glow
+	var inner := Polygon2D.new()
+	inner.color   = Color(0.35, 0.98, 0.50, 0.42)
+	inner.polygon = make_hex.call(HEX_RX, HEX_RY)
+	inner.z_index = 1
+	add_child(inner)
+
+	# Fade in over 0.5 s
+	outer.modulate.a = 0.0
+	inner.modulate.a = 0.0
+	var elapsed := 0.0
+	while elapsed < 0.5:
+		elapsed += get_physics_process_delta_time()
+		var t := elapsed / 0.5
+		outer.modulate.a = t
+		inner.modulate.a = t
+		await get_tree().physics_frame
+
+	# Hold 3 s
+	elapsed = 0.0
+	while elapsed < 3.0:
+		elapsed += get_physics_process_delta_time()
+		await get_tree().physics_frame
+
+	# Fade out over 1 s
+	elapsed = 0.0
+	while elapsed < 1.0:
+		elapsed += get_physics_process_delta_time()
+		var t := elapsed / 1.0
+		outer.modulate.a = 1.0 - t
+		inner.modulate.a = 1.0 - t
+		await get_tree().physics_frame
+
+	outer.queue_free()
+	inner.queue_free()
+
+func _emit_leaf(colour: Color) -> void:
+	var leaf := ColorRect.new()
+	leaf.color = colour
+	leaf.size  = Vector2(8, 5)
+	leaf.z_index = 3
+	var angle  := randf() * TAU
+	var dist   := randf_range(20.0, 60.0)
+	leaf.position = Vector2(cos(angle), sin(angle)) * dist
+	add_child(leaf)
+
+	var elapsed  := 0.0
+	var duration := randf_range(0.8, 1.3)
+	var drift    := Vector2(randf_range(-40, 40), randf_range(-80, -30))
+	var origin   : Vector2 = leaf.position
+	while elapsed < duration:
+		var delta := get_physics_process_delta_time()
+		elapsed  += delta
+		var t     := elapsed / duration
+		leaf.position   = origin + drift * t
+		leaf.modulate.a = 1.0 - t
+		await get_tree().physics_frame
+	leaf.queue_free()
 
 # Petty One — Guilt Trip: stay in place, emit colour waves
 func _skill_shove() -> void:
@@ -376,7 +497,7 @@ func _skill_shove() -> void:
 		last_frame  = f
 		velocity    = Vector2.ZERO
 		move_and_slide()
-		await get_tree().process_frame
+		await get_tree().physics_frame
 
 func _emit_guilt_wave(wave_index: int) -> void:
 	# Each wave gets a slightly different colour and delay
@@ -404,7 +525,7 @@ func _emit_guilt_wave(wave_index: int) -> void:
 	var duration := 1.2
 	var max_r    := 220.0 + wave_index * 40.0
 	while elapsed < duration:
-		var delta := get_process_delta_time()
+		var delta := get_physics_process_delta_time()
 		elapsed  += delta
 		var t     := elapsed / duration
 		var r     := lerpf(10.0, max_r, t)
@@ -412,7 +533,7 @@ func _emit_guilt_wave(wave_index: int) -> void:
 		ring.scale      = Vector2.ONE * (r / 10.0)
 		ring.modulate.a = 1.0 - t
 		ring.width      = lerpf(5.0, 2.0, t)
-		await get_tree().process_frame
+		await get_tree().physics_frame
 	ring.queue_free()
 
 # ── Item holding ─────────────────────────────────────────────────────────────
@@ -437,38 +558,38 @@ func load_character(path: String) -> void:
 #   Format per entry: { frame_w, frame_h, anims: [[name, fps, y, count], ...] }
 const CHARACTER_SHEET_DATA := {
 	"introvert": {
-		"frame_w": 239, "frame_h": 248,
+		"frame_w": 349, "frame_h": 259,
 		"anims": [
-			["walk",  10.0,   0, 6],
-			["idle",   4.0, 248, 4],
-			["skill", 12.0, 496, 5],
-			["hit",   16.0, 744, 3],
+			["walk",   6.0,   0, 6],
+			["idle",   4.0, 259, 4],
+			["skill",  6.0, 518, 5],
+			["hit",   16.0, 777, 2],
 		]
 	},
 	"goblin": {
-		"frame_w": 328, "frame_h": 254,
+		"frame_w": 348, "frame_h": 256,
 		"anims": [
-			["walk",  10.0,   0, 6],
-			["idle",   2.0, 254, 4],
-			["skill",  6.0, 508, 5],
-			["hit",   16.0, 762, 3],
+			["walk",   6.0,   0, 6],
+			["idle",   2.0, 256, 4],
+			["skill",  6.0, 512, 5],
+			["hit",   16.0, 768, 3],
 		]
 	},
 	"peacekeeper": {
-		"frame_w": 64, "frame_h": 64,
+		"frame_w": 403, "frame_h": 291,
 		"anims": [
-			["walk",  10.0,  0, 6],
-			["idle",   4.0, 64, 4],
-			["skill", 12.0,128, 5],
-			["hit",   16.0,192, 3],
+			["walk",   6.0,   0, 6],
+			["idle",   4.0, 291, 4],
+			["skill",  5.0, 582, 5],
+			["hit",   16.0, 873, 3],
 		]
 	},
 	"petty": {
 		"frame_w": 351, "frame_h": 296,
 		"anims": [
-			["walk",  10.0,   0, 6],
+			["walk",   6.0,   0, 6],
 			["idle",   2.0, 296, 4],
-			["skill",  5.0, 592, 5],
+			["skill",  3.0, 592, 5],
 			["hit",   16.0, 888, 3],
 		]
 	},
@@ -504,7 +625,7 @@ func _setup_sprite(path: String = "res://assets/sprites/player/introvert.png") -
 
 	var sprite := $AnimatedSprite2D
 	sprite.sprite_frames = frames
-	var scale_map : Dictionary = {"introvert": 0.40, "goblin": 0.40, "peacekeeper": 0.40, "petty": 0.45}
+	var scale_map : Dictionary = {"introvert": 0.40, "goblin": 0.40, "peacekeeper": 0.45, "petty": 0.45}
 	var s : float = scale_map.get(char_id, 0.40)
 	sprite.scale = Vector2(s, s)
 	sprite.play("idle")
