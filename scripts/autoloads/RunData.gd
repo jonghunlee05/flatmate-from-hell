@@ -30,7 +30,7 @@ var active_character := "introvert"
 
 const CHARACTER_PROFILES := {
 	"introvert":   {"hp_max": 6,  "mana_max": 4, "shield_max": 2},
-	"chaos":       {"hp_max": 9,  "mana_max": 6, "shield_max": 0},
+	"goblin":      {"hp_max": 9,  "mana_max": 6, "shield_max": 0},
 	"peacekeeper": {"hp_max": 12, "mana_max": 4, "shield_max": 4},
 	"petty":       {"hp_max": 8,  "mana_max": 3, "shield_max": 3},
 }

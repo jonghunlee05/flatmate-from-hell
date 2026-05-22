@@ -15,8 +15,8 @@ const SPEED = 200.0
 #   Facing: movement direction sets flip_h; last direction sticks on idle.
 #           Default facing is RIGHT (flip_h = false).
 #
-const FRAME_W := 208
-const FRAME_H := 260
+const FRAME_W := 239
+const FRAME_H := 248
 
 # ── Arm system (Soul Knight benchmark) ───────────────────────────────────────
 #
@@ -103,13 +103,14 @@ func _setup_arm() -> void:
 	_arm_pivot.z_index = 1
 	add_child(_arm_pivot)
 
-	# Placeholder arm line — replace with Sprite2D + arm texture when art is ready
+	# Placeholder arm line — hidden in lobby, visible in-game when holding a weapon
 	_arm_line = Line2D.new()
 	_arm_line.name = "ArmLine"
 	_arm_line.add_point(Vector2.ZERO)
 	_arm_line.add_point(Vector2(ARM_VISUAL_LEN, 0.0))
 	_arm_line.width = 5.0
 	_arm_line.default_color = Color(0.88, 0.72, 0.56)
+	_arm_line.visible = false
 	_arm_pivot.add_child(_arm_line)
 
 	# Weapon / item sprite at the hand position
@@ -202,9 +203,10 @@ func _setup_skill_hud() -> void:
 
 # ── Skill ────────────────────────────────────────────────────────────────────
 
-const SKILL_DASH_SPEED    := 900.0   # px/s at peak
-const SKILL_DASH_HOLD     := 0.18    # seconds at full speed before decelerating
-const SKILL_DASH_DECEL    := 0.20    # seconds to decelerate to zero
+const SKILL_DASH_SPEED := 900.0
+const SKILL_DASH_HOLD  := 0.18
+const SKILL_DASH_DECEL := 0.20
+const SLAM_RADIUS      := 90.0    # AOE boundary radius in px
 
 func _play_skill() -> void:
 	_skill_active = true
@@ -213,28 +215,166 @@ func _play_skill() -> void:
 	sprite.flip_h = not _facing_right
 	sprite.play("skill")
 
-	# Dash direction: facing direction (left or right)
-	var dash_dir := Vector2(1.0 if _facing_right else -1.0, 0.0)
+	match RunData.active_character:
+		"introvert":
+			await _skill_dash()
+		"goblin":
+			await _skill_slam()
+		"peacekeeper":
+			await _skill_barrier()
+		"petty":
+			await _skill_shove()
+		_:
+			await _skill_dash()
 
-	var elapsed := 0.0
-	while _skill_active and sprite.is_playing():
+	_skill_active = false
+	velocity = Vector2.ZERO
+	sprite.play("idle")
+
+# Introvert — forward dash
+func _skill_dash() -> void:
+	var sprite   := $AnimatedSprite2D
+	var dash_dir := Vector2(1.0 if _facing_right else -1.0, 0.0)
+	var elapsed  := 0.0
+	while sprite.is_playing():
 		var delta := get_process_delta_time()
 		elapsed += delta
 		var spd: float
 		if elapsed < SKILL_DASH_HOLD:
-			# Full speed phase
 			spd = SKILL_DASH_SPEED
 		else:
-			# Decelerate smoothly to zero
 			var t := clampf((elapsed - SKILL_DASH_HOLD) / SKILL_DASH_DECEL, 0.0, 1.0)
 			spd = SKILL_DASH_SPEED * (1.0 - t)
 		velocity = dash_dir * spd
 		move_and_slide()
 		await get_tree().process_frame
 
-	_skill_active = false
-	velocity = Vector2.ZERO
-	sprite.play("idle")
+# Chaos Goblin — ground slam with shadow + landing shake
+func _skill_slam() -> void:
+	var sprite := $AnimatedSprite2D
+
+	# Ground shadow — dark oval beneath the character
+	var shadow := ColorRect.new()
+	shadow.color = Color(0.0, 0.0, 0.0, 0.45)
+	shadow.size  = Vector2(60, 18)
+	shadow.position = Vector2(-30, 18)   # centred below feet
+	shadow.z_index  = -1
+	add_child(shadow)
+
+	# Target Y offsets per frame (sprite lifts up then slams down)
+	# Negative = up on screen
+	var jump_targets := {
+		0:  6.0,    # crouch — sink slightly
+		1: -28.0,   # rising
+		2: -48.0,   # peak
+		3:  0.0,    # slam back to ground
+		4:  0.0,    # recovery
+	}
+	var sprite_origin : Vector2 = sprite.position
+	var last_frame := -1
+
+	while sprite.is_playing():
+		var f      : int   = sprite.frame
+		var target : float = jump_targets.get(f, 0.0)
+		var delta          := get_process_delta_time()
+
+		# Smooth lerp toward target Y — gentle float up, instant snap on slam
+		var speed  := 8.0 if f < 3 else 999.0
+		var weight := minf(speed * delta, 1.0)   # clamp so lerpf never overshoots
+		sprite.position.y = lerpf(sprite.position.y, sprite_origin.y + target, weight)
+
+		match f:
+			0:
+				shadow.visible = false
+			1:
+				shadow.visible  = true
+				shadow.scale    = Vector2(0.4, 0.4)
+				shadow.position = Vector2(-12, 18)
+			2:
+				shadow.visible  = true
+				shadow.scale    = Vector2(0.7, 0.7)
+				shadow.position = Vector2(-21, 18)
+			3:
+				shadow.visible  = true
+				shadow.scale    = Vector2(1.0, 1.0)
+				shadow.position = Vector2(-30, 18)
+				if last_frame != 3:
+					_screen_shake(0.18, 6.0)
+					_show_slam_ring()
+			4:
+				shadow.visible  = true
+				shadow.scale    = Vector2(0.5, 0.5)
+				shadow.position = Vector2(-15, 18)
+
+		last_frame = f
+		velocity   = Vector2.ZERO
+		move_and_slide()
+		await get_tree().process_frame
+
+	# Reset sprite back to original position
+	sprite.position = sprite_origin
+	shadow.queue_free()
+
+func _show_slam_ring() -> void:
+	# Draw a circle ring at feet level using Line2D
+	var ring   := Line2D.new()
+	ring.width  = 4.0
+	ring.default_color = Color(1.0, 0.45, 0.0, 1.0)   # orange
+	ring.z_index = 2
+	# Build circle polygon
+	var pts := 40
+	for i in range(pts + 1):
+		var angle := (float(i) / pts) * TAU
+		ring.add_point(Vector2(cos(angle), sin(angle)) * SLAM_RADIUS)
+	ring.position = Vector2(0, 20)   # offset to feet
+	add_child(ring)
+
+	# Expand outward and fade over 0.5s
+	var elapsed := 0.0
+	var duration := 0.5
+	while elapsed < duration:
+		var delta := get_process_delta_time()
+		elapsed  += delta
+		var t     := elapsed / duration
+		ring.scale         = Vector2.ONE * (1.0 + t * 0.35)
+		ring.modulate.a    = 1.0 - t
+		await get_tree().process_frame
+	ring.queue_free()
+
+func _screen_shake(duration: float, strength: float) -> void:
+	var sprite := $AnimatedSprite2D
+	var origin  : Vector2 = sprite.position
+	var elapsed := 0.0
+	while elapsed < duration:
+		var delta := get_process_delta_time()
+		elapsed  += delta
+		var t     := 1.0 - elapsed / duration
+		sprite.position = origin + Vector2(
+			randf_range(-strength, strength) * t,
+			randf_range(-strength, strength) * t)
+		await get_tree().process_frame
+	sprite.position = origin
+
+# Peace Keeper — barrier in place (no movement)
+func _skill_barrier() -> void:
+	var sprite := $AnimatedSprite2D
+	while sprite.is_playing():
+		velocity = Vector2.ZERO
+		move_and_slide()
+		await get_tree().process_frame
+
+# Petty One — short forward shove lunge
+func _skill_shove() -> void:
+	var sprite   := $AnimatedSprite2D
+	var dir      := Vector2(1.0 if _facing_right else -1.0, 0.0)
+	var elapsed  := 0.0
+	while sprite.is_playing():
+		var delta := get_process_delta_time()
+		elapsed += delta
+		var t   := clampf(elapsed / 0.15, 0.0, 1.0)
+		velocity = dir * 400.0 * (1.0 - t)
+		move_and_slide()
+		await get_tree().process_frame
 
 # ── Item holding ─────────────────────────────────────────────────────────────
 
@@ -254,18 +394,57 @@ func load_character(path: String) -> void:
 	sprite.stop()
 	sprite.frame = 0
 
+# ── Per-character animation data (output from fix_sprite_sheet.py) ────────────
+#   Format per entry: { frame_w, frame_h, anims: [[name, fps, y, count], ...] }
+const CHARACTER_SHEET_DATA := {
+	"introvert": {
+		"frame_w": 239, "frame_h": 248,
+		"anims": [
+			["walk",  10.0,   0, 6],
+			["idle",   4.0, 248, 4],
+			["skill", 12.0, 496, 5],
+			["hit",   16.0, 744, 3],
+		]
+	},
+	"goblin": {
+		"frame_w": 328, "frame_h": 254,
+		"anims": [
+			["walk",  10.0,   0, 6],
+			["idle",   4.0, 254, 4],
+			["skill",  6.0, 508, 5],
+			["hit",   16.0, 762, 3],
+		]
+	},
+	"peacekeeper": {
+		"frame_w": 64, "frame_h": 64,
+		"anims": [
+			["walk",  10.0,  0, 6],
+			["idle",   4.0, 64, 4],
+			["skill", 12.0,128, 5],
+			["hit",   16.0,192, 3],
+		]
+	},
+	"petty": {
+		"frame_w": 64, "frame_h": 64,
+		"anims": [
+			["walk",  10.0,  0, 6],
+			["idle",   4.0, 64, 4],
+			["skill", 12.0,128, 5],
+			["hit",   16.0,192, 3],
+		]
+	},
+}
+
 func _setup_sprite(path: String = "res://assets/sprites/player/introvert.png") -> void:
 	var texture := load(path)
 	var frames  := SpriteFrames.new()
 
-	# [anim_name, fps, y_start, frame_count]
-	# All cells are FRAME_W × FRAME_H (208 × 260) — uniform grid from fix_sprite_sheet.py.
-	var anims := [
-		["walk",  10.0,   0, 6],
-		["idle",   4.0, 260, 4],
-		["skill", 12.0, 520, 5],
-		["hit",   16.0, 780, 2],
-	]
+	# Use the active character ID set by Lobby (matches CHARACTER_SHEET_DATA keys)
+	var char_id := RunData.active_character
+	var data    : Dictionary = CHARACTER_SHEET_DATA.get(char_id, CHARACTER_SHEET_DATA["introvert"])
+	var fw      : int   = data["frame_w"]
+	var fh      : int   = data["frame_h"]
+	var anims   : Array = data["anims"]
 
 	# skill and hit play once and stop — walk/idle loop continuously
 	var one_shot := ["skill", "hit"]
@@ -281,8 +460,10 @@ func _setup_sprite(path: String = "res://assets/sprites/player/introvert.png") -
 		for col in range(count):
 			var atlas := AtlasTexture.new()
 			atlas.atlas  = texture
-			atlas.region = Rect2(col * FRAME_W, y_start, FRAME_W, FRAME_H)
+			atlas.region = Rect2(col * fw, y_start, fw, fh)
 			frames.add_frame(anim_name, atlas)
 
-	$AnimatedSprite2D.sprite_frames = frames
-	$AnimatedSprite2D.play("idle")
+	var sprite := $AnimatedSprite2D
+	sprite.sprite_frames = frames
+	sprite.scale = Vector2(0.4, 0.4)   # 239×248 cell → ~96×99 px on screen
+	sprite.play("idle")

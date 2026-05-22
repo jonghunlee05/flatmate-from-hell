@@ -47,7 +47,7 @@ const CHARACTER_PATHS := {
 	"introvert":   "res://assets/sprites/player/introvert.png",
 	"petty":       "res://assets/sprites/player/petty_one.png",
 	"peacekeeper": "res://assets/sprites/player/peace_keeper.png",
-	"chaos":       "res://assets/sprites/player/chaos_goblin.png",
+	"goblin":      "res://assets/sprites/player/chaos_goblin.png",
 }
 
 const ITEMS := [
@@ -118,13 +118,15 @@ func _build_stat_bars() -> void:
 	var s  := _make_stat_bar("Shield", Color(0.4, 0.85, 1.0), vbox)
 	_shield_bar = s[0]; _shield_val = s[1]
 
-	# Chaos sits below with a small gap — it's ambient, not a personal stat
+	# Chaos bar exists but is hidden in lobby — only visible in-game
 	var gap := Control.new()
 	gap.custom_minimum_size = Vector2(0, 6)
+	gap.visible = false
 	vbox.add_child(gap)
 
 	var ch := _make_stat_bar("Chaos",  Color(0.85, 0.4, 0.0), vbox)
 	_chaos_bar = ch[0]; _chaos_val = ch[1]
+	_chaos_bar.get_parent().visible = false   # hide the whole HBox row
 
 func _make_stat_bar(label_text: String, fill_color: Color, parent: Node) -> Array:
 	var hbox := HBoxContainer.new()
@@ -241,13 +243,17 @@ func _close_character_select() -> void:
 func _select_character(key: String) -> void:
 	selected_character = key
 	RunData.set_character(key)
+	# Fill all stats to the new character's max
+	RunData.hp     = RunData.hp_max
+	RunData.mana   = RunData.mana_max
+	RunData.shield = RunData.shield_max
 	$Player.load_character(CHARACTER_PATHS[key])
 	_close_character_select()
 
 func _on_select_introvert() -> void:   _select_character("introvert")
 func _on_select_petty() -> void:       _select_character("petty")
 func _on_select_peacekeeper() -> void: _select_character("peacekeeper")
-func _on_select_chaos() -> void:       _select_character("chaos")
+func _on_select_chaos() -> void:       _select_character("goblin")
 
 func _setup_character_previews() -> void:
 	var previews := {
