@@ -363,18 +363,57 @@ func _skill_barrier() -> void:
 		move_and_slide()
 		await get_tree().process_frame
 
-# Petty One — short forward shove lunge
+# Petty One — Guilt Trip: stay in place, emit colour waves
 func _skill_shove() -> void:
-	var sprite   := $AnimatedSprite2D
-	var dir      := Vector2(1.0 if _facing_right else -1.0, 0.0)
-	var elapsed  := 0.0
+	var sprite  := $AnimatedSprite2D
+	var last_frame := -1
+
 	while sprite.is_playing():
-		var delta := get_process_delta_time()
-		elapsed += delta
-		var t   := clampf(elapsed / 0.15, 0.0, 1.0)
-		velocity = dir * 400.0 * (1.0 - t)
+		var f : int = sprite.frame
+		# Emit a new wave on frames 1, 2, and 3
+		if f != last_frame and f in [1, 2, 3]:
+			_emit_guilt_wave(f)
+		last_frame  = f
+		velocity    = Vector2.ZERO
 		move_and_slide()
 		await get_tree().process_frame
+
+func _emit_guilt_wave(wave_index: int) -> void:
+	# Each wave gets a slightly different colour and delay
+	var colours := [
+		Color(0.72, 0.2,  1.0, 1.0),   # purple
+		Color(1.0,  0.25, 0.75, 1.0),  # pink
+		Color(0.5,  0.1,  0.9, 1.0),   # deep violet
+	]
+	var colour : Color = colours[wave_index % colours.size()]
+
+	var ring        := Line2D.new()
+	ring.width       = 5.0
+	ring.default_color = colour
+	ring.z_index     = 2
+
+	var pts := 48
+	for i in range(pts + 1):
+		var angle := (float(i) / pts) * TAU
+		ring.add_point(Vector2(cos(angle), sin(angle)) * 10.0)
+	ring.position = Vector2(0, 10)
+	add_child(ring)
+
+	# Expand outward and fade
+	var elapsed  := 0.0
+	var duration := 1.2
+	var max_r    := 220.0 + wave_index * 40.0
+	while elapsed < duration:
+		var delta := get_process_delta_time()
+		elapsed  += delta
+		var t     := elapsed / duration
+		var r     := lerpf(10.0, max_r, t)
+		# Rescale all points by updating scale
+		ring.scale      = Vector2.ONE * (r / 10.0)
+		ring.modulate.a = 1.0 - t
+		ring.width      = lerpf(5.0, 2.0, t)
+		await get_tree().process_frame
+	ring.queue_free()
 
 # ── Item holding ─────────────────────────────────────────────────────────────
 
@@ -410,7 +449,7 @@ const CHARACTER_SHEET_DATA := {
 		"frame_w": 328, "frame_h": 254,
 		"anims": [
 			["walk",  10.0,   0, 6],
-			["idle",   4.0, 254, 4],
+			["idle",   2.0, 254, 4],
 			["skill",  6.0, 508, 5],
 			["hit",   16.0, 762, 3],
 		]
@@ -425,12 +464,12 @@ const CHARACTER_SHEET_DATA := {
 		]
 	},
 	"petty": {
-		"frame_w": 64, "frame_h": 64,
+		"frame_w": 351, "frame_h": 296,
 		"anims": [
-			["walk",  10.0,  0, 6],
-			["idle",   4.0, 64, 4],
-			["skill", 12.0,128, 5],
-			["hit",   16.0,192, 3],
+			["walk",  10.0,   0, 6],
+			["idle",   2.0, 296, 4],
+			["skill",  5.0, 592, 5],
+			["hit",   16.0, 888, 3],
 		]
 	},
 }
@@ -465,5 +504,7 @@ func _setup_sprite(path: String = "res://assets/sprites/player/introvert.png") -
 
 	var sprite := $AnimatedSprite2D
 	sprite.sprite_frames = frames
-	sprite.scale = Vector2(0.4, 0.4)   # 239×248 cell → ~96×99 px on screen
+	var scale_map : Dictionary = {"introvert": 0.40, "goblin": 0.40, "peacekeeper": 0.40, "petty": 0.45}
+	var s : float = scale_map.get(char_id, 0.40)
+	sprite.scale = Vector2(s, s)
 	sprite.play("idle")
