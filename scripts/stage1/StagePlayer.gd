@@ -140,6 +140,11 @@ func _physics_process(delta: float) -> void:
 		_update_arm()
 		return
 
+	# Skill — Space (same trigger as lobby)
+	if Input.is_action_just_pressed("use_skill") and _skill_cooldown <= 0.0:
+		_play_skill()
+		return
+
 	if _dodging:
 		_tick_dodge(delta)
 		_update_arm()
@@ -167,11 +172,7 @@ func _physics_process(delta: float) -> void:
 
 	_update_arm()
 
-	# Skill — Shift key
-	if Input.is_physical_key_pressed(KEY_SHIFT) and _skill_cooldown <= 0.0 and not _skill_active:
-		_play_skill()
-
-	# Dodge — Space + direction
+	# Dodge — Space + direction (only when skill is on cooldown)
 	if Input.is_action_just_pressed("ui_accept") and dir != Vector2.ZERO:
 		_begin_dodge(dir)
 

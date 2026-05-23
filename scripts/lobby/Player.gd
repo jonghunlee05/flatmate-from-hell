@@ -537,5 +537,7 @@ func set_held_item(item_id: String) -> void:
 # ── Character loading ─────────────────────────────────────────────────────────
 
 func load_character(_path: String) -> void:
+	_skill_active   = false
+	_skill_cooldown = 0.0
 	CharacterManager.setup_sprite($AnimatedSprite2D)
 	_facing_right = true
