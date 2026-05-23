@@ -138,6 +138,6 @@ func _process(_delta: float) -> void:
 
 # ── Public API ────────────────────────────────────────────────────────────────
 
-func show_chaos(visible: bool) -> void:
+func show_chaos(enabled: bool) -> void:
 	if _chaos_row:
-		_chaos_row.visible = visible
+		_chaos_row.visible = enabled

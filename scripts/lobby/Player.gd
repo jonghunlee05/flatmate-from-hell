@@ -239,7 +239,7 @@ func _skill_dash() -> void:
 	var sprite   := $AnimatedSprite2D
 	var dash_dir := _last_dir
 	var elapsed  := 0.0
-	while sprite.is_playing():
+	while sprite.is_playing() and is_inside_tree():
 		var delta := get_physics_process_delta_time()
 		elapsed += delta
 		var spd: float
@@ -274,16 +274,15 @@ func _skill_slam() -> void:
 		4:  0.0,    # recovery
 	}
 	var sprite_origin : Vector2 = sprite.position
-	var last_frame := -1
+	var _last_frame := -1
 
-	while sprite.is_playing():
+	while sprite.is_playing() and is_inside_tree():
 		var f      : int   = sprite.frame
 		var target : float = jump_targets.get(f, 0.0)
 		var delta          := get_physics_process_delta_time()
 
-		# Smooth lerp toward target Y — gentle float up, instant snap on slam
 		var speed  := 8.0 if f < 3 else 999.0
-		var weight := minf(speed * delta, 1.0)   # clamp so lerpf never overshoots
+		var weight := minf(speed * delta, 1.0)
 		sprite.position.y = lerpf(sprite.position.y, sprite_origin.y + target, weight)
 
 		match f:
@@ -301,7 +300,7 @@ func _skill_slam() -> void:
 				shadow.visible  = true
 				shadow.scale    = Vector2(1.0, 1.0)
 				shadow.position = Vector2(-30, 18)
-				if last_frame != 3:
+				if _last_frame != 3:
 					_screen_shake(0.18, 6.0)
 					_show_slam_ring()
 			4:
@@ -309,8 +308,8 @@ func _skill_slam() -> void:
 				shadow.scale    = Vector2(0.5, 0.5)
 				shadow.position = Vector2(-15, 18)
 
-		last_frame = f
-		velocity   = Vector2.ZERO
+		_last_frame = f
+		velocity    = Vector2.ZERO
 		move_and_slide()
 		await get_tree().physics_frame
 
@@ -335,7 +334,7 @@ func _show_slam_ring() -> void:
 	# Expand outward and fade over 0.5s
 	var elapsed := 0.0
 	var duration := 0.5
-	while elapsed < duration:
+	while elapsed < duration and is_inside_tree():
 		var delta := get_physics_process_delta_time()
 		elapsed  += delta
 		var t     := elapsed / duration
@@ -348,7 +347,7 @@ func _screen_shake(duration: float, strength: float) -> void:
 	var sprite := $AnimatedSprite2D
 	var origin  : Vector2 = sprite.position
 	var elapsed := 0.0
-	while elapsed < duration:
+	while elapsed < duration and is_inside_tree():
 		var delta := get_physics_process_delta_time()
 		elapsed  += delta
 		var t     := 1.0 - elapsed / duration
@@ -361,13 +360,10 @@ func _screen_shake(duration: float, strength: float) -> void:
 # Peace Keeper — nature mediation: expanding rings, then a persistent barrier aura
 func _skill_barrier() -> void:
 	var sprite := $AnimatedSprite2D
-	var last_frame := -1
-
-	while sprite.is_playing():
+	while sprite.is_playing() and is_inside_tree():
 		velocity = Vector2.ZERO
 		move_and_slide()
 		await get_tree().physics_frame
-
 	_show_persistent_barrier()
 
 func _emit_nature_ring(wave_index: int) -> void:
@@ -396,7 +392,7 @@ func _emit_nature_ring(wave_index: int) -> void:
 	var elapsed  := 0.0
 	var duration := 1.4
 	var max_r    := 180.0 + wave_index * 30.0
-	while elapsed < duration:
+	while elapsed < duration and is_inside_tree():
 		var delta := get_physics_process_delta_time()
 		elapsed  += delta
 		var t     := elapsed / duration
@@ -436,22 +432,20 @@ func _show_persistent_barrier() -> void:
 	outer.modulate.a = 0.0
 	inner.modulate.a = 0.0
 	var elapsed := 0.0
-	while elapsed < 0.5:
+	while elapsed < 0.5 and is_inside_tree():
 		elapsed += get_physics_process_delta_time()
 		var t := elapsed / 0.5
 		outer.modulate.a = t
 		inner.modulate.a = t
 		await get_tree().physics_frame
 
-	# Hold 3 s
 	elapsed = 0.0
-	while elapsed < 3.0:
+	while elapsed < 3.0 and is_inside_tree():
 		elapsed += get_physics_process_delta_time()
 		await get_tree().physics_frame
 
-	# Fade out over 1 s
 	elapsed = 0.0
-	while elapsed < 1.0:
+	while elapsed < 1.0 and is_inside_tree():
 		elapsed += get_physics_process_delta_time()
 		var t := elapsed / 1.0
 		outer.modulate.a = 1.0 - t
@@ -475,7 +469,7 @@ func _emit_leaf(colour: Color) -> void:
 	var duration := randf_range(0.8, 1.3)
 	var drift    := Vector2(randf_range(-40, 40), randf_range(-80, -30))
 	var origin   : Vector2 = leaf.position
-	while elapsed < duration:
+	while elapsed < duration and is_inside_tree():
 		var delta := get_physics_process_delta_time()
 		elapsed  += delta
 		var t     := elapsed / duration
@@ -486,15 +480,13 @@ func _emit_leaf(colour: Color) -> void:
 
 # Petty One — Guilt Trip: stay in place, emit colour waves
 func _skill_shove() -> void:
-	var sprite  := $AnimatedSprite2D
-	var last_frame := -1
-
-	while sprite.is_playing():
+	var sprite      := $AnimatedSprite2D
+	var _last_frame := -1
+	while sprite.is_playing() and is_inside_tree():
 		var f : int = sprite.frame
-		# Emit a new wave on frames 1, 2, and 3
-		if f != last_frame and f in [1, 2, 3]:
+		if f != _last_frame and f in [1, 2, 3]:
 			_emit_guilt_wave(f)
-		last_frame  = f
+		_last_frame = f
 		velocity    = Vector2.ZERO
 		move_and_slide()
 		await get_tree().physics_frame
@@ -524,13 +516,11 @@ func _emit_guilt_wave(wave_index: int) -> void:
 	var elapsed  := 0.0
 	var duration := 1.2
 	var max_r    := 220.0 + wave_index * 40.0
-	while elapsed < duration:
+	while elapsed < duration and is_inside_tree():
 		var delta := get_physics_process_delta_time()
 		elapsed  += delta
 		var t     := elapsed / duration
-		var r     := lerpf(10.0, max_r, t)
-		# Rescale all points by updating scale
-		ring.scale      = Vector2.ONE * (r / 10.0)
+		ring.scale      = Vector2.ONE * (lerpf(10.0, max_r, t) / 10.0)
 		ring.modulate.a = 1.0 - t
 		ring.width      = lerpf(5.0, 2.0, t)
 		await get_tree().physics_frame
@@ -549,4 +539,3 @@ func set_held_item(item_id: String) -> void:
 func load_character(_path: String) -> void:
 	CharacterManager.setup_sprite($AnimatedSprite2D)
 	_facing_right = true
-
