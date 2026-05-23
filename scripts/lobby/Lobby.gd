@@ -8,15 +8,6 @@ var rent: int = 20
 var near_interactable: String = ""
 var selected_character: String = "introvert"
 
-# Stat bars — top-left HUD, built in _build_stat_bars()
-var _hp_bar     : ProgressBar = null
-var _hp_val     : Label       = null
-var _mana_bar   : ProgressBar = null
-var _mana_val   : Label       = null
-var _shield_bar : ProgressBar = null
-var _shield_val : Label       = null
-var _chaos_bar  : ProgressBar = null
-var _chaos_val  : Label       = null
 var _e_was_pressed := false
 var inventory: Array = [null, null]
 var _pending_item: Dictionary = {}
@@ -72,12 +63,7 @@ func _ready() -> void:
 	RunData.reset()  # fully restore HP/Mana/Shield on lobby load (respawn)
 	_setup_character_previews()
 	_build_item_grid()
-	$HUD/BtnMenu.pressed.connect(_on_menu_pressed)
-	$HUD/PauseMenu/VBox/BtnResume.pressed.connect(_close_menu)
-	$HUD/PauseMenu/VBox/BtnOptions.pressed.connect(_on_options_pressed)
-	$HUD/PauseMenu/VBox/BtnQuit.pressed.connect(_on_quit_pressed)
-	$HUD/SaveConfirm/VBox/HBox/BtnYes.pressed.connect(_on_save_yes)
-	$HUD/SaveConfirm/VBox/HBox/BtnNo.pressed.connect(_on_save_no)
+	$HUD/BtnMenu.visible = false
 	$HUD/CharacterSelect/VBox/Cards/CardIntrovert/VBox/BtnSelect.pressed.connect(_on_select_introvert)
 	$HUD/CharacterSelect/VBox/Cards/CardPetty/VBox/BtnSelect.pressed.connect(_on_select_petty)
 	$HUD/CharacterSelect/VBox/Cards/CardPeacekeeper/VBox/BtnSelect.pressed.connect(_on_select_peacekeeper)
@@ -103,85 +89,14 @@ func _ready() -> void:
 	$HUD/GachaPanel/VBox/BtnGachaClose.pressed.connect(_close_gacha)
 	_update_rent()
 	_update_inventory_display()
-	_build_stat_bars()
-
-func _build_stat_bars() -> void:
-	var vbox := VBoxContainer.new()
-	vbox.position = Vector2(16, 14)
-	vbox.add_theme_constant_override("separation", 6)
-	$HUD.add_child(vbox)
-
-	var h  := _make_stat_bar("HP",     Color(0.9, 0.2, 0.2), vbox)
-	_hp_bar = h[0]; _hp_val = h[1]
-	var m  := _make_stat_bar("Mana",   Color(0.3, 0.5, 1.0), vbox)
-	_mana_bar = m[0]; _mana_val = m[1]
-	var s  := _make_stat_bar("Shield", Color(0.4, 0.85, 1.0), vbox)
-	_shield_bar = s[0]; _shield_val = s[1]
-
-	# Chaos bar exists but is hidden in lobby — only visible in-game
-	var gap := Control.new()
-	gap.custom_minimum_size = Vector2(0, 6)
-	gap.visible = false
-	vbox.add_child(gap)
-
-	var ch := _make_stat_bar("Chaos",  Color(0.85, 0.4, 0.0), vbox)
-	_chaos_bar = ch[0]; _chaos_val = ch[1]
-	_chaos_bar.get_parent().visible = false   # hide the whole HBox row
-
-func _make_stat_bar(label_text: String, fill_color: Color, parent: Node) -> Array:
-	var hbox := HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 6)
-	parent.add_child(hbox)
-
-	var lbl := Label.new()
-	lbl.text = label_text
-	lbl.custom_minimum_size = Vector2(60, 0)
-	lbl.add_theme_font_size_override("font_size", 12)
-	hbox.add_child(lbl)
-
-	var bar := ProgressBar.new()
-	bar.custom_minimum_size = Vector2(120, 18)
-	bar.show_percentage = false
-
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = fill_color
-	bar.add_theme_stylebox_override("fill", fill)
-
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.1, 0.1, 0.1, 0.8)
-	bar.add_theme_stylebox_override("background", bg)
-
-	hbox.add_child(bar)
-
-	var val_lbl := Label.new()
-	val_lbl.custom_minimum_size = Vector2(44, 0)
-	val_lbl.add_theme_font_size_override("font_size", 12)
-	val_lbl.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
-	val_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	hbox.add_child(val_lbl)
-
-	return [bar, val_lbl]
+	StatusBar.show_bar()
+	StatusBar.show_chaos(false)
+	PauseMenu.show_ui()
+	_setup_rent_icon()
 
 func _process(delta: float) -> void:
 	_check_proximity()
 	_process_floor_items(delta)
-	_update_stat_bars()
-
-func _update_stat_bars() -> void:
-	if _hp_bar == null:
-		return
-	_hp_bar.max_value    = RunData.hp_max
-	_hp_bar.value        = RunData.hp
-	_hp_val.text         = "%d / %d" % [int(RunData.hp), int(RunData.hp_max)]
-	_mana_bar.max_value  = RunData.mana_max
-	_mana_bar.value      = RunData.mana
-	_mana_val.text       = "%d / %d" % [int(RunData.mana), int(RunData.mana_max)]
-	_shield_bar.max_value = RunData.shield_max
-	_shield_bar.value     = RunData.shield
-	_shield_val.text      = "%d / %d" % [int(RunData.shield), int(RunData.shield_max)]
-	_chaos_bar.max_value  = RunData.chaos_max
-	_chaos_bar.value      = RunData.chaos
-	_chaos_val.text       = "%.1f / %d" % [RunData.chaos, int(RunData.chaos_max)]
 	var e_pressed := Input.is_physical_key_pressed(KEY_E)
 	if e_pressed and not _e_was_pressed:
 		if near_interactable != "":
@@ -600,28 +515,21 @@ func _pickup_floor_item(idx: int) -> void:
 
 # ── HUD / Menu ────────────────────────────────────────────────────────────────
 
+func _setup_rent_icon() -> void:
+	var rent_label := $HUD/RentLabel
+	var parent := rent_label.get_parent()
+	var hbox := HBoxContainer.new()
+	hbox.position = rent_label.position
+	hbox.add_theme_constant_override("separation", 4)
+	parent.add_child(hbox)
+	var icon := TextureRect.new()
+	icon.texture = load("res://assets/sprites/ui/icon_pounds.png")
+	icon.custom_minimum_size = Vector2(48, 48)
+	icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icon.expand_mode  = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	hbox.add_child(icon)
+	parent.remove_child(rent_label)
+	hbox.add_child(rent_label)
+
 func _update_rent() -> void:
-	$HUD/RentLabel.text = "Rent: £%d" % rent
-
-func _on_menu_pressed() -> void:
-	$HUD/PauseMenu.visible = true
-	get_tree().paused = true
-
-func _close_menu() -> void:
-	$HUD/PauseMenu.visible = false
-	get_tree().paused = false
-
-func _on_options_pressed() -> void:
-	pass
-
-func _on_quit_pressed() -> void:
-	$HUD/PauseMenu.visible = false
-	$HUD/SaveConfirm.visible = true
-
-func _on_save_yes() -> void:
-	get_tree().paused = false
-	get_tree().change_scene_to_file("res://scenes/ui/MainScreen.tscn")
-
-func _on_save_no() -> void:
-	get_tree().paused = false
-	get_tree().change_scene_to_file("res://scenes/ui/MainScreen.tscn")
+	$HUD/RentLabel.text = " £%d" % rent

@@ -13,15 +13,6 @@ extends CanvasLayer
 #
 # ─────────────────────────────────────────────────────────────────────────────
 
-var _hp_bar     : ProgressBar
-var _hp_val     : Label
-var _mana_bar   : ProgressBar
-var _mana_val   : Label
-var _shield_bar : ProgressBar
-var _shield_val : Label
-var _chaos_bar  : ProgressBar
-var _chaos_val  : Label
-
 var _pp_label    : Label   # peace points
 var _phase_label : Label
 var _timer_label : Label
@@ -33,30 +24,12 @@ var _chaos_tint    : ColorRect
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	StatusBar.show_bar()
+	StatusBar.show_chaos(true)
+	PauseMenu.show_ui()
 	_build_ui()
 
 func _build_ui() -> void:
-
-	# ── TOP LEFT — HP / Mana / Shield ────────────────────────────────────────
-	var left := VBoxContainer.new()
-	left.position = Vector2(16, 14)
-	left.add_theme_constant_override("separation", 6)
-	add_child(left)
-
-	var h  := _make_bar("HP",     Color(0.9, 0.2, 0.2), left)
-	_hp_bar = h[0]; _hp_val = h[1]
-	var m  := _make_bar("Mana",   Color(0.3, 0.5, 1.0), left)
-	_mana_bar = m[0]; _mana_val = m[1]
-	var s  := _make_bar("Shield", Color(0.4, 0.85, 1.0), left)
-	_shield_bar = s[0]; _shield_val = s[1]
-
-	# Chaos below — ambient stat, visually separated
-	var gap := Control.new()
-	gap.custom_minimum_size = Vector2(0, 6)
-	left.add_child(gap)
-
-	var ch := _make_bar("Chaos",  Color(0.85, 0.4, 0.0), left)
-	_chaos_bar = ch[0]; _chaos_val = ch[1]
 
 	# ── TOP RIGHT — Peace Points + Menu ──────────────────────────────────────
 	var top_right := HBoxContainer.new()
@@ -64,18 +37,19 @@ func _build_ui() -> void:
 	top_right.add_theme_constant_override("separation", 10)
 	add_child(top_right)
 
+	var cc_icon := TextureRect.new()
+	cc_icon.texture = load("res://assets/sprites/ui/icon_calm_coin.png")
+	cc_icon.custom_minimum_size = Vector2(48, 48)
+	cc_icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	cc_icon.expand_mode  = TextureRect.EXPAND_FIT_WIDTH_PROPORTIONAL
+	top_right.add_child(cc_icon)
+
 	_pp_label = Label.new()
 	_pp_label.add_theme_font_size_override("font_size", 18)
 	_pp_label.add_theme_color_override("font_color", Color(0.5, 1.0, 0.6))
 	_pp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	top_right.add_child(_pp_label)
 
-	var menu_btn := Button.new()
-	menu_btn.text = "Menu"
-	menu_btn.custom_minimum_size = Vector2(64, 28)
-	menu_btn.add_theme_font_size_override("font_size", 13)
-	menu_btn.pressed.connect(_on_menu_pressed)
-	top_right.add_child(menu_btn)
 
 	# Phase + timer below the peace-points / menu row
 	var phase_row := VBoxContainer.new()
@@ -137,69 +111,14 @@ func _build_ui() -> void:
 	_chaos_tint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_chaos_tint)
 
-# ── Bar factory ───────────────────────────────────────────────────────────────
-
-func _make_bar(label_text: String, fill_color: Color, parent: Node) -> Array:
-	var hbox := HBoxContainer.new()
-	hbox.add_theme_constant_override("separation", 6)
-	parent.add_child(hbox)
-
-	var lbl := Label.new()
-	lbl.text = label_text
-	lbl.custom_minimum_size = Vector2(52, 0)
-	lbl.add_theme_font_size_override("font_size", 12)
-	hbox.add_child(lbl)
-
-	var bar := ProgressBar.new()
-	bar.custom_minimum_size = Vector2(120, 18)
-	bar.show_percentage = false
-
-	var fill := StyleBoxFlat.new()
-	fill.bg_color = fill_color
-	bar.add_theme_stylebox_override("fill", fill)
-
-	var bg := StyleBoxFlat.new()
-	bg.bg_color = Color(0.1, 0.1, 0.1, 0.8)
-	bar.add_theme_stylebox_override("background", bg)
-
-	hbox.add_child(bar)
-
-	var val_lbl := Label.new()
-	val_lbl.custom_minimum_size = Vector2(44, 0)
-	val_lbl.add_theme_font_size_override("font_size", 12)
-	val_lbl.add_theme_color_override("font_color", Color(0.95, 0.95, 0.95))
-	val_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-	hbox.add_child(val_lbl)
-
-	return [bar, val_lbl]
-
 # ── Update loop ───────────────────────────────────────────────────────────────
 
 func _process(_delta: float) -> void:
-	_hp_bar.max_value     = RunData.hp_max
-	_hp_bar.value         = RunData.hp
-	_hp_val.text          = "%d / %d" % [int(RunData.hp), int(RunData.hp_max)]
-
-	_mana_bar.max_value   = RunData.mana_max
-	_mana_bar.value       = RunData.mana
-	_mana_val.text        = "%d / %d" % [int(RunData.mana), int(RunData.mana_max)]
-
-	_shield_bar.max_value = RunData.shield_max
-	_shield_bar.value     = RunData.shield
-	_shield_val.text      = "%d / %d" % [int(RunData.shield), int(RunData.shield_max)]
-
-	_chaos_bar.max_value  = RunData.chaos_max
-	_chaos_bar.value      = RunData.chaos
-	_chaos_val.text       = "%.1f / %d" % [RunData.chaos, int(RunData.chaos_max)]
-
-	_pp_label.text        = "⚡ %d" % RunData.peace_points
-	_phase_label.text     = RunData.PHASE_NAMES[RunData.current_phase]
-	_chaos_tint.color.a   = (RunData.chaos / RunData.chaos_max) * 0.18
+	_pp_label.text      = "%d" % RunData.peace_points
+	_phase_label.text   = RunData.PHASE_NAMES[RunData.current_phase]
+	_chaos_tint.color.a = (RunData.chaos / RunData.chaos_max) * 0.18
 
 # ── Callbacks ─────────────────────────────────────────────────────────────────
-
-func _on_menu_pressed() -> void:
-	get_tree().paused = not get_tree().paused
 
 func update_phase_timer(t: float) -> void:
 	_timer_label.text = "%ds" % int(ceili(t))

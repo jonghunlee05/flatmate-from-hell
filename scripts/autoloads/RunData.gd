@@ -82,6 +82,19 @@ func use_mana(amount: float) -> bool:
 		return true
 	return false
 
+# ── Shield regen (+1 every 3 seconds, only when below max) ───────────────────
+var _shield_regen_timer: float = 0.0
+const SHIELD_REGEN_INTERVAL: float = 3.0
+
+func _process(delta: float) -> void:
+	if shield >= shield_max or shield_max <= 0.0:
+		_shield_regen_timer = 0.0
+		return
+	_shield_regen_timer += delta
+	if _shield_regen_timer >= SHIELD_REGEN_INTERVAL:
+		_shield_regen_timer = 0.0
+		shield = minf(shield_max, shield + 1.0)
+
 # ── Currency ──────────────────────────────────────────────────────────────────
 
 func add_rent(amount: int) -> void:

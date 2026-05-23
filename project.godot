@@ -20,6 +20,8 @@ config/icon="res://icon.svg"
 
 UpgradeData="*res://scripts/data/UpgradeData.gd"
 RunData="*res://scripts/autoloads/RunData.gd"
+StatusBar="*res://scripts/ui/StatusBar.gd"
+PauseMenu="*res://scripts/ui/PauseMenu.gd"
 
 [display]
 

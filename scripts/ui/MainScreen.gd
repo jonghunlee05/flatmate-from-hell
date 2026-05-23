@@ -1,6 +1,8 @@
 extends Control
 
 func _ready() -> void:
+	StatusBar.hide_bar()
+	PauseMenu.hide_ui()
 	$VBox/BtnPlay.pressed.connect(_on_play_pressed)
 	$VBox/BtnAchievements.pressed.connect(_on_achievements_pressed)
 	$VBox/BtnOptions.pressed.connect(_on_options_pressed)
