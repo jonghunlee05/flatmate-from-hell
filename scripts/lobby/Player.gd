@@ -55,7 +55,7 @@ var _skill_cd_label  : Label
 # ─────────────────────────────────────────────────────────────────────────────
 
 func _ready() -> void:
-	_setup_sprite()
+	CharacterManager.setup_sprite($AnimatedSprite2D)
 	_setup_arm()
 	_setup_skill_hud()
 
@@ -546,86 +546,7 @@ func set_held_item(item_id: String) -> void:
 
 # ── Character loading ─────────────────────────────────────────────────────────
 
-func load_character(path: String) -> void:
-	_setup_sprite(path)
-	_facing_right = true          # reset to default right-facing on character swap
-	var sprite := $AnimatedSprite2D
-	sprite.play("idle")
-	sprite.stop()
-	sprite.frame = 0
+func load_character(_path: String) -> void:
+	CharacterManager.setup_sprite($AnimatedSprite2D)
+	_facing_right = true
 
-# ── Per-character animation data (output from fix_sprite_sheet.py) ────────────
-#   Format per entry: { frame_w, frame_h, anims: [[name, fps, y, count], ...] }
-const CHARACTER_SHEET_DATA := {
-	"introvert": {
-		"frame_w": 349, "frame_h": 259,
-		"anims": [
-			["walk",   6.0,   0, 6],
-			["idle",   4.0, 259, 4],
-			["skill",  6.0, 518, 5],
-			["hit",   16.0, 777, 2],
-		]
-	},
-	"goblin": {
-		"frame_w": 348, "frame_h": 256,
-		"anims": [
-			["walk",   6.0,   0, 6],
-			["idle",   2.0, 256, 4],
-			["skill",  6.0, 512, 5],
-			["hit",   16.0, 768, 3],
-		]
-	},
-	"peacekeeper": {
-		"frame_w": 403, "frame_h": 291,
-		"anims": [
-			["walk",   6.0,   0, 6],
-			["idle",   4.0, 291, 4],
-			["skill",  5.0, 582, 5],
-			["hit",   16.0, 873, 3],
-		]
-	},
-	"petty": {
-		"frame_w": 351, "frame_h": 296,
-		"anims": [
-			["walk",   6.0,   0, 6],
-			["idle",   2.0, 296, 4],
-			["skill",  3.0, 592, 5],
-			["hit",   16.0, 888, 3],
-		]
-	},
-}
-
-func _setup_sprite(path: String = "res://assets/sprites/player/introvert.png") -> void:
-	var texture := load(path)
-	var frames  := SpriteFrames.new()
-
-	# Use the active character ID set by Lobby (matches CHARACTER_SHEET_DATA keys)
-	var char_id := RunData.active_character
-	var data    : Dictionary = CHARACTER_SHEET_DATA.get(char_id, CHARACTER_SHEET_DATA["introvert"])
-	var fw      : int   = data["frame_w"]
-	var fh      : int   = data["frame_h"]
-	var anims   : Array = data["anims"]
-
-	# skill and hit play once and stop — walk/idle loop continuously
-	var one_shot := ["skill", "hit"]
-
-	for anim in anims:
-		var anim_name : String = anim[0]
-		var fps       : float  = anim[1]
-		var y_start   : int    = anim[2]
-		var count     : int    = anim[3]
-		frames.add_animation(anim_name)
-		frames.set_animation_speed(anim_name, fps)
-		frames.set_animation_loop(anim_name, not (anim_name in one_shot))
-		for col in range(count):
-			var atlas := AtlasTexture.new()
-			atlas.atlas  = texture
-			atlas.region = Rect2(col * fw, y_start, fw, fh)
-			frames.add_frame(anim_name, atlas)
-
-	var sprite := $AnimatedSprite2D
-	sprite.sprite_frames = frames
-	var scale_map : Dictionary = {"introvert": 0.40, "goblin": 0.40, "peacekeeper": 0.45, "petty": 0.45}
-	var s : float = scale_map.get(char_id, 0.40)
-	sprite.scale = Vector2(s, s)
-	sprite.play("idle")

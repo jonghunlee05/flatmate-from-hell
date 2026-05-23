@@ -10,23 +10,6 @@ const ATTACK_DAMAGE := 2.0
 const ATTACK_COOLDOWN := 0.45
 const INVINCIBILITY_TIME := 0.9
 
-# ── Sprite sheet data (mirrors lobby Player.gd) ───────────────────────────────
-const CHARACTER_PATHS := {
-	"introvert":   "res://assets/sprites/player/introvert.png",
-	"petty":       "res://assets/sprites/player/petty_one.png",
-	"peacekeeper": "res://assets/sprites/player/peace_keeper.png",
-	"goblin":      "res://assets/sprites/player/chaos_goblin.png",
-}
-const CHARACTER_SHEET_DATA := {
-	"introvert":   { "frame_w": 349, "frame_h": 259, "scale": 0.40,
-		"anims": [["walk", 6.0, 0, 6], ["idle", 4.0, 259, 4], ["skill", 6.0, 518, 5], ["hit", 16.0, 777, 2]] },
-	"goblin":      { "frame_w": 348, "frame_h": 256, "scale": 0.40,
-		"anims": [["walk", 6.0, 0, 6], ["idle", 2.0, 256, 4], ["skill", 6.0, 512, 5], ["hit", 16.0, 768, 3]] },
-	"peacekeeper": { "frame_w": 403, "frame_h": 291, "scale": 0.45,
-		"anims": [["walk", 6.0, 0, 6], ["idle", 4.0, 291, 4], ["skill", 5.0, 582, 5], ["hit", 16.0, 873, 3]] },
-	"petty":       { "frame_w": 351, "frame_h": 296, "scale": 0.45,
-		"anims": [["walk", 6.0, 0, 6], ["idle", 2.0, 296, 4], ["skill", 3.0, 592, 5], ["hit", 16.0, 888, 3]] },
-}
 
 # ── Arm system ────────────────────────────────────────────────────────────────
 const ARM_PIVOT_OFFSET := Vector2(0.0, -8.0)
@@ -87,7 +70,7 @@ func _ready() -> void:
 	# Character sprite
 	_sprite = AnimatedSprite2D.new()
 	add_child(_sprite)
-	_setup_sprite()
+	CharacterManager.setup_sprite(_sprite)
 
 	# Attack area
 	_attack_area                  = Area2D.new()
@@ -103,35 +86,6 @@ func _ready() -> void:
 
 	_setup_arm()
 	_setup_skill_hud()
-
-# ── Sprite setup ─────────────────────────────────────────────────────────────
-
-func _setup_sprite() -> void:
-	var char_id : String = RunData.active_character
-	var path    : String = CHARACTER_PATHS[char_id] if CHARACTER_PATHS.has(char_id) else CHARACTER_PATHS["introvert"]
-	var texture : Texture2D = load(path)
-	var data    : Dictionary = CHARACTER_SHEET_DATA[char_id] if CHARACTER_SHEET_DATA.has(char_id) else CHARACTER_SHEET_DATA["introvert"]
-	var fw      : int   = int(data["frame_w"])
-	var fh      : int   = int(data["frame_h"])
-	var s       : float = float(data["scale"])
-	var frames  : SpriteFrames = SpriteFrames.new()
-	var one_shot : Array = ["skill", "hit"]
-	for anim in data["anims"] as Array:
-		var anim_name : String = str(anim[0])
-		var fps       : float  = float(anim[1])
-		var y_start   : int    = int(anim[2])
-		var count     : int    = int(anim[3])
-		frames.add_animation(anim_name)
-		frames.set_animation_speed(anim_name, fps)
-		frames.set_animation_loop(anim_name, not (anim_name in one_shot))
-		for col in range(count):
-			var atlas := AtlasTexture.new()
-			atlas.atlas  = texture
-			atlas.region = Rect2(col * fw, y_start, fw, fh)
-			frames.add_frame(anim_name, atlas)
-	_sprite.sprite_frames = frames
-	_sprite.scale = Vector2(s, s)
-	_sprite.play("idle")
 
 # ── Arm setup ────────────────────────────────────────────────────────────────
 
@@ -347,8 +301,7 @@ func _tick_skill_cooldown(delta: float) -> void:
 
 func _play_skill() -> void:
 	_skill_active = true
-	var cooldowns := {"introvert": 1.0, "goblin": 1.0, "peacekeeper": 8.0, "petty": 1.0}
-	_skill_cooldown = float(cooldowns.get(RunData.active_character, SKILL_COOLDOWN_MAX))
+	_skill_cooldown = CharacterManager.get_skill_cooldown(RunData.active_character)
 	_skill_cd_bar.max_value = _skill_cooldown
 	_sprite.flip_h = not _facing_right
 	_sprite.play("skill")
