@@ -21,6 +21,16 @@ var _arm_line     : Line2D  = null
 var _arm_right    := true
 var _facing_right := true
 
+# ── Broom item ────────────────────────────────────────────────────────────────
+const BROOM_PATH     := "res://assets/items/broom.png"
+const BROOM_COLS     := 3
+const BROOM_ROWS     := 3
+const BROOM_ITEM_SCALE := 0.09   # idle sprite on arm
+const BROOM_EFFECT_SCALE := 0.22 # sweep/clean effect
+
+var _broom_tex         : Texture2D       = null
+var _broom_item_sprite : AnimatedSprite2D = null
+
 # ── Other state ───────────────────────────────────────────────────────────────
 
 var _sprite      : AnimatedSprite2D
@@ -31,7 +41,11 @@ var _dodge_dir   := Vector2.RIGHT
 var _attack_timer    := 0.0
 var _inv_timer       := 0.0
 var _near_scavenge   : Node2D = null
-var _e_was_pressed   := false
+var _near_mess           : Node2D          = null
+var _e_was_pressed       := false
+var _clean_hold          := 0.0
+var _clean_effect        : AnimatedSprite2D = null
+const CLEAN_HOLD_TIME    := 2.0
 var _knockback       := Vector2.ZERO
 var _knockback_timer := 0.0
 var _slow_timer      := 0.0
@@ -85,7 +99,11 @@ func _ready() -> void:
 	_attack_area.add_child(ac)
 
 	_setup_arm()
+	_setup_broom()
 	_setup_skill_hud()
+	# Show cleaning motion once on enter as placeholder
+	get_tree().create_timer(0.8).timeout.connect(func():
+		if is_instance_valid(self): _spawn_broom_effect(2))
 
 # ── Arm setup ────────────────────────────────────────────────────────────────
 
@@ -103,6 +121,92 @@ func _setup_arm() -> void:
 	_arm_line.width         = 5.0
 	_arm_line.default_color = Color(0.88, 0.72, 0.56)
 	_arm_pivot.add_child(_arm_line)
+
+# ── Broom setup ──────────────────────────────────────────────────────────────
+
+func _setup_broom() -> void:
+	_broom_tex = load(BROOM_PATH) as Texture2D
+	var fw := _broom_tex.get_width()  / BROOM_COLS
+	var fh := _broom_tex.get_height() / BROOM_ROWS
+
+	var frames := SpriteFrames.new()
+	frames.remove_animation("default")
+	frames.add_animation("idle")
+	frames.set_animation_speed("idle", 3.0)
+	for i in range(BROOM_COLS):
+		var at := AtlasTexture.new()
+		at.atlas = _broom_tex
+		at.region = Rect2(i * fw, 0, fw, fh)   # row 0
+		frames.add_frame("idle", at)
+
+	_broom_item_sprite = AnimatedSprite2D.new()
+	_broom_item_sprite.sprite_frames = frames
+	_broom_item_sprite.scale = Vector2(BROOM_ITEM_SCALE, BROOM_ITEM_SCALE)
+	_broom_item_sprite.position = Vector2(ARM_VISUAL_LEN + 4, 0)
+	_broom_item_sprite.play("idle")
+	_arm_pivot.add_child(_broom_item_sprite)
+
+	# Hide the raw arm line — broom handle is part of the sprite
+	_arm_line.visible = false
+
+func _spawn_broom_effect(row: int) -> void:
+	if _broom_tex == null or not is_inside_tree():
+		return
+	var fw := _broom_tex.get_width()  / BROOM_COLS
+	var fh := _broom_tex.get_height() / BROOM_ROWS
+
+	var frames := SpriteFrames.new()
+	frames.remove_animation("default")
+	frames.add_animation("play")
+	frames.set_animation_speed("play", 9.0)
+	frames.set_animation_loop("play", false)
+	for i in range(BROOM_COLS):
+		var at := AtlasTexture.new()
+		at.atlas = _broom_tex
+		at.region = Rect2(i * fw, row * fh, fw, fh)
+		frames.add_frame("play", at)
+
+	var effect := AnimatedSprite2D.new()
+	effect.sprite_frames = frames
+	effect.scale = Vector2(BROOM_EFFECT_SCALE, BROOM_EFFECT_SCALE)
+
+	if row == 1:
+		# Attack: orient toward mouse
+		var mouse_dir := (get_global_mouse_position() - global_position).normalized()
+		effect.rotation = mouse_dir.angle()
+		effect.global_position = global_position + mouse_dir * 28.0
+	else:
+		# Clean: centred on player, no rotation
+		effect.global_position = global_position
+
+	get_tree().current_scene.add_child(effect)
+	effect.play("play")
+	effect.animation_finished.connect(func(): effect.queue_free())
+
+func _spawn_broom_effect_loop(row: int) -> AnimatedSprite2D:
+	if _broom_tex == null or not is_inside_tree():
+		return null
+	var fw := _broom_tex.get_width()  / BROOM_COLS
+	var fh := _broom_tex.get_height() / BROOM_ROWS
+
+	var frames := SpriteFrames.new()
+	frames.remove_animation("default")
+	frames.add_animation("play")
+	frames.set_animation_speed("play", 9.0)
+	frames.set_animation_loop("play", true)   # loops until freed
+	for i in range(BROOM_COLS):
+		var at := AtlasTexture.new()
+		at.atlas = _broom_tex
+		at.region = Rect2(i * fw, row * fh, fw, fh)
+		frames.add_frame("play", at)
+
+	var effect := AnimatedSprite2D.new()
+	effect.sprite_frames = frames
+	effect.scale = Vector2(BROOM_EFFECT_SCALE, BROOM_EFFECT_SCALE)
+	effect.global_position = global_position
+	get_tree().current_scene.add_child(effect)
+	effect.play("play")
+	return effect
 
 # ── Arm update ───────────────────────────────────────────────────────────────
 
@@ -127,6 +231,25 @@ func _physics_process(delta: float) -> void:
 	if e and not _e_was_pressed and _near_scavenge != null:
 		_near_scavenge.interact()
 	_e_was_pressed = e
+
+	var l := Input.is_physical_key_pressed(KEY_L)
+	if l and _near_mess != null:
+		if _clean_effect == null or not is_instance_valid(_clean_effect):
+			_clean_effect = _spawn_broom_effect_loop(2)
+		else:
+			_clean_effect.global_position = global_position
+		_clean_hold += delta
+		_near_mess.set_clean_progress(_clean_hold / CLEAN_HOLD_TIME)
+		if _clean_hold >= CLEAN_HOLD_TIME:
+			_stop_clean_effect()
+			_near_mess.clean()
+			_near_mess = null
+			_clean_hold = 0.0
+	else:
+		_stop_clean_effect()
+		if _near_mess != null:
+			_near_mess.set_clean_progress(0.0)
+		_clean_hold = 0.0
 
 	if _knockback_timer > 0.0:
 		_knockback_timer -= delta
@@ -175,6 +298,11 @@ func _physics_process(delta: float) -> void:
 	# Dodge — Space + direction (only when skill is on cooldown)
 	if Input.is_action_just_pressed("ui_accept") and dir != Vector2.ZERO:
 		_begin_dodge(dir)
+
+func _stop_clean_effect() -> void:
+	if _clean_effect != null and is_instance_valid(_clean_effect):
+		_clean_effect.queue_free()
+	_clean_effect = null
 
 func _input_dir() -> Vector2:
 	var d := Vector2.ZERO
@@ -226,13 +354,14 @@ func _do_attack() -> void:
 		if col.has_method("take_damage"):
 			col.take_damage(ATTACK_DAMAGE)
 
+	# Broom attack effect (row 1)
+	_spawn_broom_effect(1)
+
 	# Flash on swing
 	_sprite.modulate = Color(0.5, 0.9, 1.0)
-	_arm_line.default_color = Color(1.0, 0.95, 0.5)
 	get_tree().create_timer(0.08).timeout.connect(func():
 		if is_instance_valid(self):
-			_sprite.modulate        = Color.WHITE
-			_arm_line.default_color = Color(0.88, 0.72, 0.56))
+			_sprite.modulate = Color.WHITE)
 
 # ── Invincibility ─────────────────────────────────────────────────────────────
 
@@ -492,6 +621,18 @@ func _tick_scavenge_check() -> void:
 			prev.show_prompt(false)
 		if _near_scavenge != null:
 			_near_scavenge.show_prompt(true)
+
+	var prev_mess := _near_mess
+	_near_mess = null
+	for obj in get_tree().get_nodes_in_group("mess"):
+		if is_instance_valid(obj) and obj.global_position.distance_to(global_position) < 72.0:
+			_near_mess = obj
+			break
+	if prev_mess != _near_mess:
+		if prev_mess != null and is_instance_valid(prev_mess):
+			prev_mess.show_prompt(false)
+		if _near_mess != null:
+			_near_mess.show_prompt(true)
 
 # ── Hit response ──────────────────────────────────────────────────────────────
 

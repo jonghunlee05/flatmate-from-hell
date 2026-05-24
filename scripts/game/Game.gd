@@ -6,6 +6,7 @@ const PlayerScript = preload("res://scripts/stage1/StagePlayer.gd")
 const PhaseScript  = preload("res://scripts/stage1/PhaseManager.gd")
 const HUDScript    = preload("res://scripts/stage1/StageHUD.gd")
 const ScavengeScript = preload("res://scripts/stage1/ScavengeObject.gd")
+const MessScript     = preload("res://scripts/stage1/MessObject.gd")
 const DroneScript    = preload("res://scripts/stage1/enemies/GamerDrone.gd")
 const CanEnemyScript = preload("res://scripts/stage1/enemies/ThrownCanEnemy.gd")
 const ChairScript    = preload("res://scripts/stage1/hazards/RollingChair.gd")
@@ -109,6 +110,8 @@ func _build_bedroom() -> void:
 		Vector2(120, 290), Vector2(360, 290)])
 	_add_scavenge(room, Vector2(65, 55), 0)   # drawer
 	_add_scavenge(room, Vector2(400, 355), 2) # pizza_box
+	_add_mess(room, Vector2(220, 200))        # placeholder mess
+	_add_mess(room, Vector2(320, 260))        # placeholder mess
 	_add_room_label(room, "Bedroom", W, H)
 
 func _build_hallway() -> void:
@@ -336,6 +339,12 @@ func _add_scavenge(room: Node2D, local_pos: Vector2, type_int: int) -> void:
 	obj.position = local_pos
 	obj.setup(type_int)
 	room.register_scavenge(obj)
+
+func _add_mess(room: Node2D, local_pos: Vector2) -> void:
+	var obj := Node2D.new()
+	obj.set_script(MessScript)
+	room.add_child(obj)
+	obj.position = local_pos
 
 func _add_room_label(room: Node2D, text: String, W: float, _H: float) -> void:
 	var lbl := Label.new()
