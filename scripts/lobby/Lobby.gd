@@ -8,14 +8,12 @@ var rent: int = 20
 var near_interactable: String = ""
 var selected_character: String = "introvert"
 
-var _e_was_pressed := false
-var inventory: Array = [null, null]
-var _pending_item: Dictionary = {}
-var _gacha_result: Dictionary = {}
-var _drop_slot: int = -1
-var _floor_items: Array = []
-var _near_floor_item_idx: int = -1
-var _active_slot: int = 0
+var _e_was_pressed    := false
+var _pending_item     : Dictionary = {}
+var _gacha_result     : Dictionary = {}
+var _drop_slot_key    : String = ""   # "slot1" / "slot2" / "slot3" / "passive"
+var _floor_items      : Array  = []
+var _near_floor_item_idx : int = -1
 
 const INTERACTABLES := {
 	"Character Wardrobe": Vector2(550, 60),
@@ -60,10 +58,12 @@ const ITEMS := [
 ]
 
 func _ready() -> void:
-	RunData.reset()  # fully restore HP/Mana/Shield on lobby load (respawn)
+	RunData.reset()    # fully restore HP/Mana/Shield on lobby load
+	ItemSlots.reset()  # fresh loadout every time lobby is entered (broom default in slot1)
 	_setup_character_previews()
 	_build_item_grid()
 	$HUD/BtnMenu.visible = false
+	$HUD/InventoryBar.visible = false
 	$HUD/CharacterSelect/VBox/Cards/CardIntrovert/VBox/BtnSelect.pressed.connect(_on_select_introvert)
 	$HUD/CharacterSelect/VBox/Cards/CardPetty/VBox/BtnSelect.pressed.connect(_on_select_petty)
 	$HUD/CharacterSelect/VBox/Cards/CardPeacekeeper/VBox/BtnSelect.pressed.connect(_on_select_peacekeeper)
@@ -73,12 +73,6 @@ func _ready() -> void:
 	$HUD/SlotPicker/VBox/HBox/BtnSlot1.pressed.connect(_on_slot_replace.bind(0))
 	$HUD/SlotPicker/VBox/HBox/BtnSlot2.pressed.connect(_on_slot_replace.bind(1))
 	$HUD/SlotPicker/VBox/BtnCancel.pressed.connect(_on_slot_cancel)
-	$HUD/InventoryBar/Slot1.gui_input.connect(_on_slot_gui_input.bind(0))
-	$HUD/InventoryBar/Slot2.gui_input.connect(_on_slot_gui_input.bind(1))
-	for i in range(2):
-		$HUD/InventoryBar.get_node("Slot%d/HBox/Icon" % (i + 1)).mouse_filter = Control.MOUSE_FILTER_PASS
-		$HUD/InventoryBar.get_node("Slot%d/HBox/Label" % (i + 1)).mouse_filter = Control.MOUSE_FILTER_PASS
-		$HUD/InventoryBar.get_node("Slot%d/HBox" % (i + 1)).mouse_filter = Control.MOUSE_FILTER_PASS
 	$HUD/DropConfirm/VBox/HBox/BtnDrop.pressed.connect(_on_drop_confirm)
 	$HUD/DropConfirm/VBox/HBox/BtnKeep.pressed.connect(_on_drop_cancel)
 	$HUD/UpgradePanel/VBox/BtnClose.pressed.connect(_close_upgrade_desk)
@@ -92,6 +86,7 @@ func _ready() -> void:
 	StatusBar.show_bar()
 	StatusBar.show_chaos(false)
 	PauseMenu.show_ui()
+	ItemSlotBar.show_bar()
 	_setup_rent_icon()
 
 func _process(delta: float) -> void:
@@ -207,8 +202,9 @@ func _build_item_grid() -> void:
 
 		var icon := TextureRect.new()
 		icon.custom_minimum_size = Vector2(64, 64)
+		icon.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		icon.texture = load("res://assets/sprites/items/" + item["id"] + ".png")
+		icon.texture = ItemSlots.get_icon_texture(item["id"])
 		vbox.add_child(icon)
 
 		var name_lbl := Label.new()
@@ -256,96 +252,77 @@ func _rarity_color(rarity: String) -> Color:
 	return Color.WHITE
 
 func _on_item_picked(item: Dictionary) -> void:
-	if inventory[0] == null:
-		inventory[0] = item
+	_close_item_select()
+	_try_equip(item)
+
+func _try_equip(item: Dictionary) -> void:
+	var key : String = ItemSlots.SLOT_MAP.get(item.get("id", ""), "slot2")
+	var current : Dictionary = _get_slot(key)
+	if current.is_empty():
+		ItemSlots.equip(item)
 		_update_inventory_display()
-		_close_item_select()
-	elif inventory[1] == null:
-		inventory[1] = item
-		_update_inventory_display()
-		_close_item_select()
 	else:
 		_pending_item = item
-		$HUD/ItemSelect.visible = false
-		_open_slot_picker()
+		_open_slot_picker(key, current)
 
-func _open_slot_picker() -> void:
-	$HUD/SlotPicker/VBox/HBox/BtnSlot1.text = "Slot 1: " + inventory[0]["name"]
-	$HUD/SlotPicker/VBox/HBox/BtnSlot2.text = "Slot 2: " + inventory[1]["name"]
+func _get_slot(key: String) -> Dictionary:
+	match key:
+		"slot1":   return ItemSlots.slot1
+		"slot2":   return ItemSlots.slot2
+		"slot3":   return ItemSlots.slot3
+		"passive": return ItemSlots.passive
+	return {}
+
+func _open_slot_picker(key: String, current: Dictionary) -> void:
+	_drop_slot_key = key
+	var slot_label := {"slot1": "Cleaning", "slot2": "Combat", "slot3": "Flex", "passive": "Passive"}
+	$HUD/SlotPicker/VBox/HBox/BtnSlot1.text = "Replace %s: %s" % [slot_label.get(key, key), current.get("name", "?")]
+	$HUD/SlotPicker/VBox/HBox/BtnSlot2.visible = false
 	$HUD/SlotPicker.visible = true
 	get_tree().paused = true
 
-func _on_slot_replace(slot: int) -> void:
-	inventory[slot] = _pending_item
+func _on_slot_replace(_slot: int) -> void:
+	var old := _get_slot(_drop_slot_key)
+	ItemSlots.equip(_pending_item)
 	_pending_item = {}
-	_active_slot = slot
 	_update_inventory_display()
+	$HUD/SlotPicker/VBox/HBox/BtnSlot2.visible = true
 	$HUD/SlotPicker.visible = false
 	get_tree().paused = false
+	if not old.is_empty():
+		_spawn_floor_item(old)
 
 func _on_slot_cancel() -> void:
 	_pending_item = {}
+	$HUD/SlotPicker/VBox/HBox/BtnSlot2.visible = true
 	$HUD/SlotPicker.visible = false
 	get_tree().paused = false
 
-func _on_slot_gui_input(event: InputEvent, slot: int) -> void:
-	if not (event is InputEventMouseButton and event.pressed):
-		return
-	if event.button_index == MOUSE_BUTTON_LEFT:
-		if _active_slot != slot:
-			_active_slot = slot
-			_update_inventory_display()
-	elif event.button_index == MOUSE_BUTTON_RIGHT:
-		if inventory[slot] != null:
-			_drop_slot = slot
-			$HUD/DropConfirm/VBox/Label.text = "Drop " + inventory[slot]["name"] + "?"
-			$HUD/DropConfirm.visible = true
-			get_tree().paused = true
-
 func _on_drop_confirm() -> void:
-	var dropped_item: Dictionary = inventory[_drop_slot]
-	inventory[_drop_slot] = null
-	if _drop_slot == _active_slot:
-		var other := 1 - _active_slot
-		if inventory[other] != null:
-			_active_slot = other
-	_drop_slot = -1
+	var dropped := _get_slot(_drop_slot_key)
+	match _drop_slot_key:
+		"slot1":   ItemSlots.slot1   = {}
+		"slot2":   ItemSlots.slot2   = {}
+		"slot3":   ItemSlots.slot3   = {}
+		"passive": ItemSlots.passive = {}
+	_drop_slot_key = ""
+	ItemSlots.emit_signal("slots_changed")
 	_update_inventory_display()
 	$HUD/DropConfirm.visible = false
 	get_tree().paused = false
-	_spawn_floor_item(dropped_item)
+	if not dropped.is_empty():
+		_spawn_floor_item(dropped)
 
 func _on_drop_cancel() -> void:
-	_drop_slot = -1
+	_drop_slot_key = ""
 	$HUD/DropConfirm.visible = false
 	get_tree().paused = false
 
 func _update_inventory_display() -> void:
-	for i in range(2):
-		var slot := $HUD/InventoryBar.get_node("Slot%d" % (i + 1))
-		var icon: TextureRect = slot.get_node("HBox/Icon")
-		var label: Label = slot.get_node("HBox/Label")
-		if inventory[i] == null:
-			icon.texture = null
-			icon.visible = false
-			label.text = "[ empty ]"
-			slot.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		else:
-			icon.texture = load("res://assets/sprites/items/" + inventory[i]["id"] + ".png")
-			icon.visible = true
-			label.text = inventory[i]["name"]
-			slot.mouse_filter = Control.MOUSE_FILTER_STOP
-		slot.add_theme_stylebox_override("panel", _slot_style(i == _active_slot))
-	var held_id: String = inventory[_active_slot]["id"] if inventory[_active_slot] != null else ""
+	# ItemSlotBar refreshes itself via slots_changed signal
+	# Just update the held item on the player character
+	var held_id: String = ItemSlots.slot1.get("id", "") if not ItemSlots.slot1.is_empty() else ""
 	$Player.set_held_item(held_id)
-
-func _slot_style(active: bool) -> StyleBoxFlat:
-	var s := StyleBoxFlat.new()
-	s.bg_color = Color(0.12, 0.12, 0.12, 0.88)
-	s.set_border_width_all(3)
-	s.border_color = Color(1.0, 0.82, 0.2) if active else Color(0.35, 0.35, 0.35)
-	s.set_corner_radius_all(4)
-	return s
 
 # ── Gachapon ──────────────────────────────────────────────────────────────────
 
@@ -374,7 +351,7 @@ func _on_gacha_roll() -> void:
 
 	_gacha_result = ITEMS[randi() % ITEMS.size()]
 	var result := $HUD/GachaPanel/VBox/ResultPanel
-	result.get_node("ResultIcon").texture = load("res://assets/sprites/items/" + _gacha_result["id"] + ".png")
+	result.get_node("ResultIcon").texture = ItemSlots.get_icon_texture(_gacha_result["id"])
 	result.get_node("ResultName").text = _gacha_result["name"]
 	result.get_node("ResultType").text = _gacha_result["type"]
 	var rlbl: Label = result.get_node("ResultRarity")
@@ -388,17 +365,8 @@ func _on_gacha_pickup() -> void:
 	var item := _gacha_result
 	_gacha_result = {}
 	$HUD/GachaPanel.visible = false
-	if inventory[0] == null:
-		inventory[0] = item
-		_update_inventory_display()
-		get_tree().paused = false
-	elif inventory[1] == null:
-		inventory[1] = item
-		_update_inventory_display()
-		get_tree().paused = false
-	else:
-		_pending_item = item
-		_open_slot_picker()
+	get_tree().paused = false
+	_try_equip(item)
 
 # ── Exit Door ─────────────────────────────────────────────────────────────────
 
@@ -483,9 +451,18 @@ func _on_upgrade_buy(upgrade: Dictionary) -> void:
 
 func _spawn_floor_item(item: Dictionary) -> void:
 	var sprite := Sprite2D.new()
-	sprite.texture = load("res://assets/sprites/items/" + item["id"] + ".png")
+	var item_id: String = item.get("id", "")
+	var raw: Texture2D = load(ItemSlots.get_icon_path(item_id))
+	sprite.texture = raw
+	if item_id in ItemSlots.HAS_SHEET and raw != null:
+		sprite.hframes = 3
+		sprite.vframes = 3
+		sprite.frame   = 0
+		var frame_px: float = raw.get_width() / 3.0
+		sprite.scale = Vector2(48.0 / frame_px, 48.0 / frame_px)
+	else:
+		sprite.scale = Vector2(1.8, 1.8)
 	sprite.position = $Player.position + Vector2(28, 24)
-	sprite.scale = Vector2(1.8, 1.8)
 	add_child(sprite)
 	_floor_items.append({"item": item, "node": sprite, "timer": FLOOR_ITEM_LIFETIME})
 
@@ -503,15 +480,7 @@ func _pickup_floor_item(idx: int) -> void:
 	_floor_items[idx]["node"].queue_free()
 	_floor_items.remove_at(idx)
 	_near_floor_item_idx = -1
-	if inventory[0] == null:
-		inventory[0] = item
-		_update_inventory_display()
-	elif inventory[1] == null:
-		inventory[1] = item
-		_update_inventory_display()
-	else:
-		_pending_item = item
-		_open_slot_picker()
+	_try_equip(item)
 
 # ── HUD / Menu ────────────────────────────────────────────────────────────────
 

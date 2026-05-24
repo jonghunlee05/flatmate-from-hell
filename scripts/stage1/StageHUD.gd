@@ -27,6 +27,7 @@ func _ready() -> void:
 	StatusBar.show_bar()
 	StatusBar.show_chaos(true)
 	PauseMenu.show_ui()
+	ItemSlotBar.show_bar()
 	_build_ui()
 
 func _build_ui() -> void:

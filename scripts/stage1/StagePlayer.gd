@@ -21,12 +21,11 @@ var _arm_line     : Line2D  = null
 var _arm_right    := true
 var _facing_right := true
 
-# ── Broom item ────────────────────────────────────────────────────────────────
-const BROOM_PATH     := "res://assets/items/broom.png"
-const BROOM_COLS     := 3
-const BROOM_ROWS     := 3
-const BROOM_ITEM_SCALE := 0.09   # idle sprite on arm
-const BROOM_EFFECT_SCALE := 0.22 # sweep/clean effect
+# ── Slot 1 item (cleaning) ────────────────────────────────────────────────────
+const ITEM_COLS        := 3
+const ITEM_ROWS        := 3
+const ITEM_SCALE       := 0.09   # idle sprite on arm
+const EFFECT_SCALE     := 0.22   # sweep/clean effect
 
 var _broom_tex         : Texture2D       = null
 var _broom_item_sprite : AnimatedSprite2D = null
@@ -101,9 +100,6 @@ func _ready() -> void:
 	_setup_arm()
 	_setup_broom()
 	_setup_skill_hud()
-	# Show cleaning motion once on enter as placeholder
-	get_tree().create_timer(0.8).timeout.connect(func():
-		if is_instance_valid(self): _spawn_broom_effect(2))
 
 # ── Arm setup ────────────────────────────────────────────────────────────────
 
@@ -125,15 +121,21 @@ func _setup_arm() -> void:
 # ── Broom setup ──────────────────────────────────────────────────────────────
 
 func _setup_broom() -> void:
-	_broom_tex = load(BROOM_PATH) as Texture2D
-	var fw := _broom_tex.get_width()  / BROOM_COLS
-	var fh := _broom_tex.get_height() / BROOM_ROWS
+	# Read slot1 from global ItemSlots — defaults to broom if nothing equipped
+	var item_id   : String = ItemSlots.slot1.get("id", "broom") if ItemSlots.has_slot1() else "broom"
+	var sheet_path: String = ItemSlots.get_sheet_path(item_id)
+
+	_broom_tex = load(sheet_path) as Texture2D
+	if _broom_tex == null:
+		return
+	var fw := _broom_tex.get_width()  / ITEM_COLS
+	var fh := _broom_tex.get_height() / ITEM_ROWS
 
 	var frames := SpriteFrames.new()
 	frames.remove_animation("default")
 	frames.add_animation("idle")
 	frames.set_animation_speed("idle", 3.0)
-	for i in range(BROOM_COLS):
+	for i in range(ITEM_COLS):
 		var at := AtlasTexture.new()
 		at.atlas = _broom_tex
 		at.region = Rect2(i * fw, 0, fw, fh)   # row 0
@@ -141,26 +143,26 @@ func _setup_broom() -> void:
 
 	_broom_item_sprite = AnimatedSprite2D.new()
 	_broom_item_sprite.sprite_frames = frames
-	_broom_item_sprite.scale = Vector2(BROOM_ITEM_SCALE, BROOM_ITEM_SCALE)
+	_broom_item_sprite.scale = Vector2(ITEM_SCALE, ITEM_SCALE)
 	_broom_item_sprite.position = Vector2(ARM_VISUAL_LEN + 4, 0)
 	_broom_item_sprite.play("idle")
 	_arm_pivot.add_child(_broom_item_sprite)
 
-	# Hide the raw arm line — broom handle is part of the sprite
+	# Hide the raw arm line — item handle is part of the sprite
 	_arm_line.visible = false
 
 func _spawn_broom_effect(row: int) -> void:
 	if _broom_tex == null or not is_inside_tree():
 		return
-	var fw := _broom_tex.get_width()  / BROOM_COLS
-	var fh := _broom_tex.get_height() / BROOM_ROWS
+	var fw := _broom_tex.get_width()  / ITEM_COLS
+	var fh := _broom_tex.get_height() / ITEM_ROWS
 
 	var frames := SpriteFrames.new()
 	frames.remove_animation("default")
 	frames.add_animation("play")
 	frames.set_animation_speed("play", 9.0)
 	frames.set_animation_loop("play", false)
-	for i in range(BROOM_COLS):
+	for i in range(ITEM_COLS):
 		var at := AtlasTexture.new()
 		at.atlas = _broom_tex
 		at.region = Rect2(i * fw, row * fh, fw, fh)
@@ -168,7 +170,7 @@ func _spawn_broom_effect(row: int) -> void:
 
 	var effect := AnimatedSprite2D.new()
 	effect.sprite_frames = frames
-	effect.scale = Vector2(BROOM_EFFECT_SCALE, BROOM_EFFECT_SCALE)
+	effect.scale = Vector2(EFFECT_SCALE, EFFECT_SCALE)
 
 	if row == 1:
 		# Attack: orient toward mouse
@@ -186,15 +188,15 @@ func _spawn_broom_effect(row: int) -> void:
 func _spawn_broom_effect_loop(row: int) -> AnimatedSprite2D:
 	if _broom_tex == null or not is_inside_tree():
 		return null
-	var fw := _broom_tex.get_width()  / BROOM_COLS
-	var fh := _broom_tex.get_height() / BROOM_ROWS
+	var fw := _broom_tex.get_width()  / ITEM_COLS
+	var fh := _broom_tex.get_height() / ITEM_ROWS
 
 	var frames := SpriteFrames.new()
 	frames.remove_animation("default")
 	frames.add_animation("play")
 	frames.set_animation_speed("play", 9.0)
 	frames.set_animation_loop("play", true)   # loops until freed
-	for i in range(BROOM_COLS):
+	for i in range(ITEM_COLS):
 		var at := AtlasTexture.new()
 		at.atlas = _broom_tex
 		at.region = Rect2(i * fw, row * fh, fw, fh)
@@ -202,7 +204,7 @@ func _spawn_broom_effect_loop(row: int) -> AnimatedSprite2D:
 
 	var effect := AnimatedSprite2D.new()
 	effect.sprite_frames = frames
-	effect.scale = Vector2(BROOM_EFFECT_SCALE, BROOM_EFFECT_SCALE)
+	effect.scale = Vector2(EFFECT_SCALE, EFFECT_SCALE)
 	effect.global_position = global_position
 	get_tree().current_scene.add_child(effect)
 	effect.play("play")

@@ -33,7 +33,7 @@ const FRAME_H := 248
 #
 const ARM_PIVOT_OFFSET := Vector2(0.0, -8.0)   # shoulder, player-local pixels
 const ARM_VISUAL_LEN   := 18.0                  # placeholder line length
-const WEAPON_OFFSET    := Vector2(22.0, 0.0)    # pivot → weapon centre
+const WEAPON_OFFSET    := Vector2(22.0, 16.0)    # pivot → weapon centre
 const FACING_UP_SIN    := -0.60                 # sin threshold: arm z behind body
 
 var _arm_pivot   : Node2D    = null
@@ -43,9 +43,13 @@ var _arm_right   := true     # arm pointing right? (weapon flip only)
 var _facing_right := true    # body flip — driven by movement, sticks on idle
 var _last_dir    := Vector2(1.0, 0.0)   # last non-zero input direction, used for dash
 
-var _skill_active   := false   # true while skill animation is playing
-var _skill_cooldown := 0.0     # seconds remaining on cooldown
+var _skill_active   := false
+var _skill_cooldown := 0.0
 const SKILL_COOLDOWN_MAX := 1.0
+
+var _attack_cooldown := 0.0
+const ATTACK_COOLDOWN := 0.45
+var _item_sheet_tex  : Texture2D = null   # cached sheet for effect spawning
 
 # ── Skill HUD ────────────────────────────────────────────────────────────────
 var _skill_hud       : CanvasLayer
@@ -60,6 +64,13 @@ func _ready() -> void:
 	_setup_skill_hud()
 
 func _physics_process(delta: float) -> void:
+	# LMB attack — show item swing effect
+	if _attack_cooldown > 0.0:
+		_attack_cooldown -= delta
+	if Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT) and _attack_cooldown <= 0.0:
+		_spawn_item_attack_effect()
+		_attack_cooldown = ATTACK_COOLDOWN
+
 	# Tick cooldown
 	if _skill_cooldown > 0.0:
 		_skill_cooldown -= delta
@@ -528,11 +539,58 @@ func _emit_guilt_wave(wave_index: int) -> void:
 
 # ── Item holding ─────────────────────────────────────────────────────────────
 
+func _spawn_item_attack_effect() -> void:
+	if _item_sheet_tex == null or not is_inside_tree():
+		return
+	var fw := _item_sheet_tex.get_width()  / 3
+	var fh := _item_sheet_tex.get_height() / 3
+	var frames := SpriteFrames.new()
+	frames.remove_animation("default")
+	frames.add_animation("play")
+	frames.set_animation_speed("play", 9.0)
+	frames.set_animation_loop("play", false)
+	for i in range(3):
+		var at := AtlasTexture.new()
+		at.atlas  = _item_sheet_tex
+		at.region = Rect2(i * fw, fh, fw, fh)   # row 1 = attack
+		frames.add_frame("play", at)
+	var effect := AnimatedSprite2D.new()
+	effect.sprite_frames = frames
+	effect.scale = Vector2(0.22, 0.22)
+	var mouse_dir := (get_global_mouse_position() - global_position).normalized()
+	effect.rotation = mouse_dir.angle()
+	effect.global_position = global_position + mouse_dir * 28.0
+	get_tree().current_scene.add_child(effect)
+	effect.play("play")
+	effect.animation_finished.connect(func(): effect.queue_free())
+
 func set_held_item(item_id: String) -> void:
 	if _weapon_node == null:
 		return
-	_weapon_node.texture = null if item_id == "" else \
-		load("res://assets/sprites/items/" + item_id + ".png")
+	if item_id == "":
+		_weapon_node.texture = null
+		_weapon_node.hframes = 1
+		_weapon_node.vframes = 1
+		return
+	var raw: Texture2D = load(ItemSlots.get_icon_path(item_id))
+	if raw == null:
+		return
+	_weapon_node.texture = raw
+	# Cache for attack effect spawning
+	_item_sheet_tex = raw if item_id in ItemSlots.HAS_SHEET else null
+	if item_id in ItemSlots.HAS_SHEET:
+		# Spritesheet — show only the first frame using hframes/vframes
+		_weapon_node.hframes = 3
+		_weapon_node.vframes = 3
+		_weapon_node.frame  = 0
+		var frame_px: float = raw.get_width() / 3.0
+		_weapon_node.scale  = Vector2(72.0 / frame_px, 72.0 / frame_px)
+	else:
+		_weapon_node.hframes = 1
+		_weapon_node.vframes = 1
+		_weapon_node.frame  = 0
+		var px: float = max(float(raw.get_width()), float(raw.get_height()))
+		_weapon_node.scale  = Vector2(72.0 / px, 72.0 / px)
 
 # ── Character loading ─────────────────────────────────────────────────────────
 
