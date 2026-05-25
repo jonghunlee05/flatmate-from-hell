@@ -87,7 +87,7 @@ func sync_from_lobby(inventory: Array) -> void:
 	emit_signal("slots_changed")
 
 # Items that have a full 3×3 animation spritesheet (idle / attack / clean rows)
-const HAS_SHEET := ["broom"]
+const HAS_SHEET := ["broom", "spray_bottle"]
 
 # Path for a given item's sprite file
 func get_icon_path(item_id: String) -> String:
